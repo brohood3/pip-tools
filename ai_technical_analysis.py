@@ -713,22 +713,30 @@ def run_analysis(token_id):
     print(f"- Real-time Price: ${current_price:.2f}")
     print(f"- Latest 4h Close: ${prev_close:.2f}")
     print(f"- Price Difference: ${price_diff:.2f} ({price_diff_pct:.2f}%)")
-    if 'sma_20' in indicators:
-        print(f"- 20 Period MA (5 days): ${indicators['sma_20']:.2f}")
-    if 'sma_50' in indicators:
-        print(f"- 50 Period MA (12.5 days): ${indicators['sma_50']:.2f}")
+    print(f"- 20 Period MA (5 days): ${indicators['sma_20']:.2f}")
+    print(f"- 50 Period MA (12.5 days): ${indicators['sma_50']:.2f}")
     
     print("\nTrend Analysis (4h timeframe):")
     print("- MA Slopes:")
-    if 'ma_20_slope' in trend_context:
-        print(f"  * 20 Period MA: {trend_context['ma_20_slope']:.2f}%")
-    if 'ma_50_slope' in trend_context:
-        print(f"  * 50 Period MA: {trend_context['ma_50_slope']:.2f}%")
+    print(f"  * 20 Period MA: {trend_context['ma_20_slope']:.2f}%")
+    print(f"  * 50 Period MA: {trend_context['ma_50_slope']:.2f}%")
+    print(f"- Current Trend: {trend_context['trend_direction']} ({trend_context['trend_strength']})")
+    print(f"- ADX (Trend Strength): {indicators['adx']:.2f}")
+    print(f"- DI+ (Bullish Pressure): {indicators['di_plus']:.2f}")
+    print(f"- DI- (Bearish Pressure): {indicators['di_minus']:.2f}")
+    print(f"- Parabolic SAR: ${indicators['psar']:.2f}")
     
-    if 'trend_direction' in trend_context and 'trend_strength' in trend_context:
-        print(f"- Current Trend: {trend_context['trend_direction']} ({trend_context['trend_strength']})")
+    print("\nMomentum Indicators:")
+    print(f"- RSI (14): {indicators['rsi']:.2f}")
+    print(f"- Stochastic K: {indicators['stoch_k']:.2f}")
+    print(f"- Stochastic D: {indicators['stoch_d']:.2f}")
+    print(f"- Williams %R: {indicators['williams_r']:.2f}")
+    print(f"- Rate of Change: {indicators['roc']:.2f}")
+    print(f"- Awesome Oscillator: {indicators['ao']:.2f}")
+    print(f"- MACD: {indicators['macd']:.2f}")
+    print(f"- MACD Signal: {indicators['macd_signal']:.2f}")
+    print(f"- MACD Histogram: {indicators['macd_hist']:.2f}")
     
-    # Volume Analysis
     print("\nVolume Analysis:")
     avg_volume = df['volume'].mean()
     current_volume = df['volume'].iloc[-1]
@@ -736,15 +744,66 @@ def run_analysis(token_id):
     print(f"- Average 4h Volume: ${avg_volume:,.2f}")
     print(f"- Current 4h Volume: ${current_volume:,.2f}")
     print(f"- Volume Ratio: {volume_ratio:.2f}% of average")
+    print(f"- Money Flow Index: {indicators['mfi']:.2f}")
+    print(f"- On-Balance Volume: {indicators['obv']:.2f}")
+    print(f"- Accumulation/Distribution: {indicators['acc_dist']:.2f}")
+    print(f"- Chaikin Money Flow: {indicators['cmf']:.2f}")
+    print(f"- Ease of Movement: {indicators['eom']:.2f}")
+    print(f"- Force Index: {indicators['force_index']:.2f}")
+    print(f"- Volume-Price Trend: {indicators['vpt']:.2f}")
+    
+    print("\nVolatility Indicators:")
+    print(f"- ATR: ${indicators['atr']:.2f}")
+    print("\nBollinger Bands:")
+    print(f"- Upper: ${indicators['bollinger_upper']:.2f}")
+    print(f"- Middle: ${indicators['bollinger_middle']:.2f}")
+    print(f"- Lower: ${indicators['bollinger_lower']:.2f}")
+    print("\nKeltner Channel:")
+    print(f"- Upper: ${indicators['keltner_high']:.2f}")
+    print(f"- Middle: ${indicators['keltner_mid']:.2f}")
+    print(f"- Lower: ${indicators['keltner_low']:.2f}")
+    print("\nDonchian Channel:")
+    print(f"- Upper: ${indicators['donchian_high']:.2f}")
+    print(f"- Middle: ${indicators['donchian_mid']:.2f}")
+    print(f"- Lower: ${indicators['donchian_low']:.2f}")
+    
+    print("\nIchimoku Cloud:")
+    print(f"- Conversion Line: ${indicators['ichimoku_conv']:.2f}")
+    print(f"- Base Line: ${indicators['ichimoku_base']:.2f}")
+    print(f"- Leading Span A: ${indicators['ichimoku_a']:.2f}")
+    print(f"- Leading Span B: ${indicators['ichimoku_b']:.2f}")
     
     # Pattern Analysis
-    if patterns:
-        print("\nDetected Patterns:")
-        for pattern_name, pattern_data in patterns.items():
-            if pattern_data:
-                print(f"- {pattern_name}")
-    else:
-        print("\nNo significant patterns detected in the current timeframe")
+    print("\nCandlestick Patterns:")
+    if indicators['doji']: print("- Doji")
+    if indicators['hammer']: print("- Hammer")
+    if indicators['shooting_star']: print("- Shooting Star")
+    if indicators['bullish_engulfing']: print("- Bullish Engulfing")
+    if indicators['bearish_engulfing']: print("- Bearish Engulfing")
+    
+    print("\nPrice Patterns:")
+    if indicators['double_top']: print("- Double Top")
+    if indicators['double_bottom']: print("- Double Bottom")
+    if indicators['price_breakout']: print("- Price Breakout")
+    if indicators['price_breakdown']: print("- Price Breakdown")
+    if indicators['volume_breakout']: print("- Volume-Confirmed Breakout")
+    
+    print("\nDivergence Analysis:")
+    print("Bullish Divergences:")
+    if divergences['bullish']['regular']:
+        print(f"- Regular (Strength: {divergences['bullish']['strength']:.2f})")
+    if divergences['bullish']['hidden']:
+        print("- Hidden")
+    if not divergences['bullish']['regular'] and not divergences['bullish']['hidden']:
+        print("- None detected")
+        
+    print("Bearish Divergences:")
+    if divergences['bearish']['regular']:
+        print(f"- Regular (Strength: {divergences['bearish']['strength']:.2f})")
+    if divergences['bearish']['hidden']:
+        print("- Hidden")
+    if not divergences['bearish']['regular'] and not divergences['bearish']['hidden']:
+        print("- None detected")
     
     # Support and Resistance
     print("\nKey Price Levels:")
@@ -766,12 +825,10 @@ def run_analysis(token_id):
 
 def detect_candlestick_patterns(df: pd.DataFrame) -> Dict[str, bool]:
     """
-    Detect common candlestick patterns using traditional TA rules
-    Returns dictionary of pattern signals
+    Detect common candlestick patterns using traditional TA rules with more sensitive thresholds
     """
     try:
-        # We have plenty of data (180 periods), just verify it's not empty
-        if len(df) < 2:  # Need at least 2 candles for patterns
+        if len(df) < 2:
             print("Not enough data for candlestick pattern detection")
             return {}
         
@@ -785,60 +842,59 @@ def detect_candlestick_patterns(df: pd.DataFrame) -> Dict[str, bool]:
         lower_shadow = min(latest['open'], latest['close']) - latest['low']
         total_range = latest['high'] - latest['low']
         
-        if total_range == 0:  # Avoid division by zero
+        if total_range == 0:
             return {}
         
         patterns = {}
         
-        # Calculate average range and volatility using 5 periods instead of 10
-        avg_range = df['high'].tail(5).mean() - df['low'].tail(5).mean()
+        # Calculate average range and volatility using 3 periods (more sensitive)
+        avg_range = df['high'].tail(3).mean() - df['low'].tail(3).mean()
         if avg_range == 0:
             return {}
             
-        # Doji - Traditional rules with slightly relaxed criteria
+        # Doji - More sensitive criteria
         doji_conditions = [
-            abs(body) <= (total_range * 0.15),  # Increased from 0.1 to 0.15
-            total_range > (avg_range * 0.4),    # Reduced from 0.5 to 0.4
-            (upper_shadow + lower_shadow) > abs(body) * 1.5  # Reduced from 2 to 1.5
+            abs(body) <= (total_range * 0.2),  # Increased from 0.15 to 0.2
+            total_range > (avg_range * 0.3),    # Reduced from 0.4 to 0.3
+            (upper_shadow + lower_shadow) > abs(body) * 1.2  # Reduced from 1.5 to 1.2
         ]
         patterns['doji'] = all(doji_conditions)
         
-        # Hammer - Traditional rules with adjusted trend check
-        # Check for downward pressure in recent periods (reduced from 15 to 8 periods)
-        price_declining = sum(df['close'].tail(8) < df['open'].tail(8)) >= 5  # More than half bearish
+        # Hammer - More sensitive criteria
+        price_declining = sum(df['close'].tail(5) < df['open'].tail(5)) >= 3  # Reduced from 8 to 5 periods
         hammer_conditions = [
-            lower_shadow > (total_range * 0.5),  # Reduced from 0.6 to 0.5
-            upper_shadow <= (total_range * 0.15), # Increased from 0.1 to 0.15
-            abs(body) <= (total_range * 0.4),    # Increased from 0.3 to 0.4
+            lower_shadow > (total_range * 0.4),  # Reduced from 0.5 to 0.4
+            upper_shadow <= (total_range * 0.2), # Increased from 0.15 to 0.2
+            abs(body) <= (total_range * 0.5),    # Increased from 0.4 to 0.5
             price_declining                       # Recent downward pressure
         ]
         patterns['hammer'] = all(hammer_conditions)
         
-        # Shooting Star - Traditional rules with adjusted trend check
-        price_advancing = sum(df['close'].tail(8) > df['open'].tail(8)) >= 5  # More than half bullish
+        # Shooting Star - More sensitive criteria
+        price_advancing = sum(df['close'].tail(5) > df['open'].tail(5)) >= 3  # Reduced from 8 to 5 periods
         star_conditions = [
-            upper_shadow > (total_range * 0.5),  # Reduced from 0.6 to 0.5
-            lower_shadow <= (total_range * 0.15), # Increased from 0.1 to 0.15
-            abs(body) <= (total_range * 0.4),    # Increased from 0.3 to 0.4
+            upper_shadow > (total_range * 0.4),  # Reduced from 0.5 to 0.4
+            lower_shadow <= (total_range * 0.2), # Increased from 0.15 to 0.2
+            abs(body) <= (total_range * 0.5),    # Increased from 0.4 to 0.5
             price_advancing                       # Recent upward pressure
         ]
         patterns['shooting_star'] = all(star_conditions)
         
-        # Engulfing patterns with relaxed criteria
+        # Engulfing patterns with more sensitive criteria
         prev_body = prev['close'] - prev['open']
         curr_size = abs(body)
         prev_size = abs(prev_body)
         
-        # Check recent trend for context (reduced from 10 to 5 periods)
-        recent_trend_bearish = sum(df['close'].tail(5) < df['open'].tail(5)) >= 3
-        recent_trend_bullish = sum(df['close'].tail(5) > df['open'].tail(5)) >= 3
+        # Check recent trend for context (reduced from 5 to 3 periods)
+        recent_trend_bearish = sum(df['close'].tail(3) < df['open'].tail(3)) >= 2
+        recent_trend_bullish = sum(df['close'].tail(3) > df['open'].tail(3)) >= 2
         
         bullish_engulfing_conditions = [
             body > 0,                            # Current candle is bullish
             prev_body < 0,                       # Previous candle is bearish
-            latest['close'] > prev['open'],      # Closes above previous open
-            latest['open'] < prev['close'],      # Opens below previous close
-            curr_size > prev_size * 1.2,         # Reduced from 1.5 to 1.2
+            latest['close'] > prev['open'] * 0.999,  # Closes near/above previous open (0.1% tolerance)
+            latest['open'] < prev['close'] * 1.001,  # Opens near/below previous close (0.1% tolerance)
+            curr_size > prev_size * 1.1,         # Reduced from 1.2 to 1.1
             recent_trend_bearish                 # Appears in downtrend
         ]
         patterns['bullish_engulfing'] = all(bullish_engulfing_conditions)
@@ -846,9 +902,9 @@ def detect_candlestick_patterns(df: pd.DataFrame) -> Dict[str, bool]:
         bearish_engulfing_conditions = [
             body < 0,                            # Current candle is bearish
             prev_body > 0,                       # Previous candle is bullish
-            latest['open'] > prev['close'],      # Opens above previous close
-            latest['close'] < prev['open'],      # Closes below previous open
-            curr_size > prev_size * 1.2,         # Reduced from 1.5 to 1.2
+            latest['open'] > prev['close'] * 0.999,  # Opens near/above previous close (0.1% tolerance)
+            latest['close'] < prev['open'] * 1.001,  # Closes near/below previous open (0.1% tolerance)
+            curr_size > prev_size * 1.1,         # Reduced from 1.2 to 1.1
             recent_trend_bullish                 # Appears in uptrend
         ]
         patterns['bearish_engulfing'] = all(bearish_engulfing_conditions)
@@ -861,14 +917,12 @@ def detect_candlestick_patterns(df: pd.DataFrame) -> Dict[str, bool]:
 
 def detect_price_patterns(df: pd.DataFrame) -> Dict[str, bool]:
     """
-    Detect technical price patterns using traditional TA rules
-    Returns dictionary of pattern signals
+    Detect technical price patterns using more sensitive thresholds
     """
     try:
         patterns = {}
         
-        # We have plenty of data (180 periods), just verify it's not empty
-        if len(df) < 30:  # Need at least 30 periods for meaningful patterns
+        if len(df) < 20:  # Reduced from 30 to 20 periods minimum
             print("Not enough data for price pattern detection")
             return patterns
         
@@ -876,33 +930,33 @@ def detect_price_patterns(df: pd.DataFrame) -> Dict[str, bool]:
         latest_close = df['close'].iloc[-1]
         latest_volume = df['volume'].iloc[-1]
         
-        # Calculate ATR for volatility-based thresholds (reduced from 14 to 10 periods)
-        atr = ta.volatility.AverageTrueRange(df['high'], df['low'], df['close'], window=10).average_true_range().iloc[-1]
+        # Calculate ATR with shorter period (reduced from 10 to 5 periods)
+        atr = ta.volatility.AverageTrueRange(df['high'], df['low'], df['close'], window=5).average_true_range().iloc[-1]
         if pd.isna(atr) or atr == 0:
             print("Invalid ATR value")
             return patterns
             
-        # Find significant peaks and troughs with adjusted window
-        def find_peaks_troughs(data: pd.Series, window: int = 5) -> tuple[list, list]:  # Reduced from 10 to 5
+        # Find peaks and troughs with smaller window
+        def find_peaks_troughs(data: pd.Series, window: int = 3) -> tuple[list, list]:  # Reduced from 5 to 3
             peaks = []
             troughs = []
             
             for i in range(window, len(data) - window):
-                # Look for more significant peaks/troughs with relaxed criteria
-                if all(data.iloc[i] > data.iloc[i-j] * 0.998 for j in range(1, window+1)) and \
-                       all(data.iloc[i] > data.iloc[i+j] * 0.998 for j in range(1, window+1)):
+                # More sensitive peak/trough detection
+                if all(data.iloc[i] > data.iloc[i-j] * 0.999 for j in range(1, window+1)) and \
+                   all(data.iloc[i] > data.iloc[i+j] * 0.999 for j in range(1, window+1)):
                     peaks.append((i, data.iloc[i]))
                     
-                if all(data.iloc[i] < data.iloc[i-j] * 1.002 for j in range(1, window+1)) and \
-                   all(data.iloc[i] < data.iloc[i+j] * 1.002 for j in range(1, window+1)):
+                if all(data.iloc[i] < data.iloc[i-j] * 1.001 for j in range(1, window+1)) and \
+                   all(data.iloc[i] < data.iloc[i+j] * 1.001 for j in range(1, window+1)):
                     troughs.append((i, data.iloc[i]))
             
             return peaks, troughs
         
         # Find peaks and troughs
-        peaks, troughs = find_peaks_troughs(df['high'], window=5)  # Reduced window
+        peaks, troughs = find_peaks_troughs(df['high'])
         
-        # Double Top Pattern with relaxed requirements
+        # Double Top Pattern with more sensitive requirements
         if len(peaks) >= 2:
             last_two_peaks = peaks[-2:]
             peak_diff = abs(last_two_peaks[0][1] - last_two_peaks[1][1])
@@ -911,14 +965,14 @@ def detect_price_patterns(df: pd.DataFrame) -> Dict[str, bool]:
             avg_peak_height = (last_two_peaks[0][1] + last_two_peaks[1][1]) / 2
             
             double_top_conditions = [
-                peak_diff <= (avg_peak_height * 0.03),  # Increased from 0.02 to 0.03
-                time_between >= 10,  # Reduced from 20 to 10
-                time_between <= 30,  # Reduced from 60 to 30
-                min_between < min(last_two_peaks[0][1], last_two_peaks[1][1]) * 0.97  # Changed from 0.95 to 0.97
+                peak_diff <= (avg_peak_height * 0.04),  # Increased from 0.03 to 0.04
+                time_between >= 5,   # Reduced from 10 to 5
+                time_between <= 40,  # Increased from 30 to 40
+                min_between < min(last_two_peaks[0][1], last_two_peaks[1][1]) * 0.98  # Changed from 0.97 to 0.98
             ]
             patterns['double_top'] = all(double_top_conditions)
         
-        # Double Bottom Pattern with relaxed requirements
+        # Double Bottom Pattern with more sensitive requirements
         if len(troughs) >= 2:
             last_two_troughs = troughs[-2:]
             trough_diff = abs(last_two_troughs[0][1] - last_two_troughs[1][1])
@@ -927,15 +981,15 @@ def detect_price_patterns(df: pd.DataFrame) -> Dict[str, bool]:
             avg_trough_height = (last_two_troughs[0][1] + last_two_troughs[1][1]) / 2
             
             double_bottom_conditions = [
-                trough_diff <= (avg_trough_height * 0.03),  # Increased from 0.02 to 0.03
-                time_between >= 10,  # Reduced from 20 to 10
-                time_between <= 30,  # Reduced from 60 to 30
-                max_between > max(last_two_troughs[0][1], last_two_troughs[1][1]) * 1.03  # Changed from 1.05 to 1.03
+                trough_diff <= (avg_trough_height * 0.04),  # Increased from 0.03 to 0.04
+                time_between >= 5,   # Reduced from 10 to 5
+                time_between <= 40,  # Increased from 30 to 40
+                max_between > max(last_two_troughs[0][1], last_two_troughs[1][1]) * 1.02  # Changed from 1.03 to 1.02
             ]
             patterns['double_bottom'] = all(double_bottom_conditions)
         
         # Calculate dynamic support and resistance using shorter periods
-        def calculate_pivots(df: pd.DataFrame, window: int = 15) -> tuple[float, float]:  # Reduced from 30 to 15
+        def calculate_pivots(df: pd.DataFrame, window: int = 10) -> tuple[float, float]:  # Reduced from 15 to 10
             recent_df = df.tail(window)
             pivot = (recent_df['high'].mean() + recent_df['low'].mean() + recent_df['close'].mean()) / 3
             resistance = pivot + (pivot - recent_df['low'].mean())
@@ -943,29 +997,29 @@ def detect_price_patterns(df: pd.DataFrame) -> Dict[str, bool]:
             return support, resistance
         
         support, resistance = calculate_pivots(df)
-        avg_volume = df['volume'].rolling(window=15).mean().iloc[-1]  # Reduced from 30 to 15
+        avg_volume = df['volume'].rolling(window=10).mean().iloc[-1]  # Reduced from 15 to 10
         
-        # Breakout patterns with relaxed volume confirmation (using 3 periods for momentum)
+        # Breakout patterns with more sensitive volume confirmation
         breakout_conditions = [
             latest_close > resistance,                    # Price above resistance
-            latest_close > (resistance + atr * 0.3),      # Reduced from 0.5 to 0.3
-            latest_volume > avg_volume * 1.3,             # Reduced from 1.5 to 1.3
-            df['close'].tail(3).is_monotonic_increasing  # Reduced from 5 to 3 periods
+            latest_close > (resistance + atr * 0.2),      # Reduced from 0.3 to 0.2
+            latest_volume > avg_volume * 1.2,             # Reduced from 1.3 to 1.2
+            df['close'].tail(2).is_monotonic_increasing  # Reduced from 3 to 2 periods
         ]
         patterns['price_breakout'] = all(breakout_conditions)
         
-        # Breakdown patterns with relaxed volume confirmation
+        # Breakdown patterns with more sensitive confirmation
         breakdown_conditions = [
             latest_close < support,                      # Price below support
-            latest_close < (support - atr * 0.3),        # Reduced from 0.5 to 0.3
-            latest_volume > avg_volume * 1.3,            # Reduced from 1.5 to 1.3
-            df['close'].tail(3).is_monotonic_decreasing # Reduced from 5 to 3 periods
+            latest_close < (support - atr * 0.2),        # Reduced from 0.3 to 0.2
+            latest_volume > avg_volume * 1.2,            # Reduced from 1.3 to 1.2
+            df['close'].tail(2).is_monotonic_decreasing # Reduced from 3 to 2 periods
         ]
         patterns['price_breakdown'] = all(breakdown_conditions)
         
-        # Volume-confirmed breakout with relaxed criteria
+        # Volume-confirmed breakout with more sensitive criteria
         if patterns['price_breakout']:
-            volume_confirmation = all(df['volume'].tail(3) > avg_volume * 1.3)  # Reduced from 5 to 3 periods and 1.5 to 1.3
+            volume_confirmation = all(df['volume'].tail(2) > avg_volume * 1.2)  # Reduced from 3 to 2 periods and 1.3 to 1.2
             patterns['volume_breakout'] = volume_confirmation
         
         return patterns
@@ -1024,52 +1078,116 @@ def analyze_trend_context(df: pd.DataFrame) -> dict:
 
 def generate_ai_summary(indicators: TechnicalIndicators, trend_context: dict, divergences: dict) -> str:
     """
-    Generate an insightful technical analysis summary using OpenAI
+    Generate an insightful, opinionated technical analysis summary using OpenAI
     """
     try:
         client = OpenAI()
         
         # Format the data for the prompt
-        prompt = f"""As a seasoned technical analyst, provide an insightful and opinionated analysis of the current market structure and potential opportunities/risks based on 4-hour interval data over the last 30 days. Include key indicators and price levels. Here's the technical data:
+        prompt = f"""As a seasoned technical analyst, provide an insightful and opinionated analysis of the current market structure and potential opportunities/risks based on 4-hour interval data over the last 30 days. Here's the technical data:
+
+Timeframe Context:
+- Analysis Period: 30 days
+- Interval: 4-hour candles
+- Total Periods: 180 (6 candles per day)
 
 Market Context:
-Current Price: ${indicators['current_price']:,.2f}
+Current Price: ${indicators['current_price']:,.2f} (4h close)
 Trend: {trend_context['trend_strength']} {trend_context['trend_direction']}
-MA Slopes: 
-- 20 Period MA: {trend_context['ma_20_slope']:.2f}%
-- 50 Period MA: {trend_context['ma_50_slope']:.2f}%
+MA Slopes (4h timeframe): 
+- 20 Period MA (5 days): {trend_context['ma_20_slope']:.2f}%
+- 50 Period MA (12.5 days): {trend_context['ma_50_slope']:.2f}%
+Price vs MAs: 
+- 20 Period MA: ${indicators['sma_20']:,.2f}
+- 50 Period MA: ${indicators['sma_50']:,.2f}
+
+Trend Strength & Direction:
+ADX: {indicators['adx']:.2f} ({trend_context['trend_strength']})
+DI+/DI-: {indicators['di_plus']:.2f}/{indicators['di_minus']:.2f}
+Parabolic SAR: ${indicators['psar']:.2f}
 
 Price Structure:
 - Higher Highs: {'Yes' if trend_context['higher_highs'] else 'No'}
 - Lower Lows: {'Yes' if trend_context['lower_lows'] else 'No'}
-- Volume Confirms Trend: {'Yes' if trend_context['volume_confirms_trend'] else 'No'}
+- Volume Confirms: {'Yes' if trend_context['volume_confirms_trend'] else 'No'}
 
-Key Indicators:
-RSI: {indicators['rsi']:.2f}
-MACD: {indicators['macd']:.2f} (Signal: {indicators['macd_signal']:.2f})
+Momentum Indicators:
+RSI (14): {indicators['rsi']:.2f}
 Stochastic: K={indicators['stoch_k']:.2f}, D={indicators['stoch_d']:.2f}
-ADX: {indicators['adx']:.2f}
-ATR: ${indicators['atr']:.2f}
+Williams %R: {indicators['williams_r']:.2f}
+Rate of Change: {indicators['roc']:.2f}
+Awesome Oscillator: {indicators['ao']:.2f}
+MACD: {indicators['macd']:.2f} (Signal: {indicators['macd_signal']:.2f}, Hist: {indicators['macd_hist']:.2f})
 
 Volume Analysis:
-Current Volume Ratio: {indicators['volume_ratio']:.2f}x
-MFI: {indicators['mfi']:.2f}
-OBV: {indicators['obv']:.2f}
+Current Volume: {indicators['current_volume']:.2f}
+Volume vs Average: {indicators['volume_ratio']:.2f}x
+Money Flow Index: {indicators['mfi']:.2f}
+On-Balance Volume: {indicators['obv']:.2f}
+Accumulation/Distribution: {indicators['acc_dist']:.2f}
+Chaikin Money Flow: {indicators['cmf']:.2f}
+Ease of Movement: {indicators['eom']:.2f}
+Force Index: {indicators['force_index']:.2f}
+Volume-Price Trend: {indicators['vpt']:.2f}
 
-Based on this technical data, provide a concise but insightful analysis that:
-1. Interprets the current market structure
-2. Identifies key levels and potential trade setups, including candlestick patterns and price patterns
-3. Highlights significant risks or warning signs
-4. Suggests specific price levels to watch
+Volatility & Channels:
+ATR: ${indicators['atr']:.2f}
+Bollinger Bands:
+- Upper: ${indicators['bollinger_upper']:.2f}
+- Middle: ${indicators['bollinger_middle']:.2f}
+- Lower: ${indicators['bollinger_lower']:.2f}
+Keltner Channel:
+- Upper: ${indicators['keltner_high']:.2f}
+- Middle: ${indicators['keltner_mid']:.2f}
+- Lower: ${indicators['keltner_low']:.2f}
+Donchian Channel:
+- Upper: ${indicators['donchian_high']:.2f}
+- Middle: ${indicators['donchian_mid']:.2f}
+- Lower: ${indicators['donchian_low']:.2f}
 
-Be direct and opinionated - if you see a compelling setup or concerning pattern, say so clearly."""
+Ichimoku Cloud:
+- Conversion Line: ${indicators['ichimoku_conv']:.2f}
+- Base Line: ${indicators['ichimoku_base']:.2f}
+- Leading Span A: ${indicators['ichimoku_a']:.2f}
+- Leading Span B: ${indicators['ichimoku_b']:.2f}
+
+Candlestick Patterns:
+{'🔔 Doji' if indicators['doji'] else ''}
+{'🔔 Hammer' if indicators['hammer'] else ''}
+{'🔔 Shooting Star' if indicators['shooting_star'] else ''}
+{'🔔 Bullish Engulfing' if indicators['bullish_engulfing'] else ''}
+{'🔔 Bearish Engulfing' if indicators['bearish_engulfing'] else ''}
+
+Price Patterns:
+{'🔔 Double Top' if indicators['double_top'] else ''}
+{'🔔 Double Bottom' if indicators['double_bottom'] else ''}
+{'🔔 Price Breakout' if indicators['price_breakout'] else ''}
+{'🔔 Price Breakdown' if indicators['price_breakdown'] else ''}
+{'🔔 Volume-Confirmed Breakout' if indicators['volume_breakout'] else ''}
+
+Divergences:
+{'🔔 Regular Bullish Divergence' if divergences['bullish']['regular'] else ''}
+{'🔔 Hidden Bullish Divergence' if divergences['bullish']['hidden'] else ''}
+{'🔔 Regular Bearish Divergence' if divergences['bearish']['regular'] else ''}
+{'🔔 Hidden Bearish Divergence' if divergences['bearish']['hidden'] else ''}
+
+Based on this comprehensive technical data, provide an opinionated analysis that:
+1. Interprets the current market structure and what it suggests about market psychology
+2. Highlights the most significant patterns/signals and explains WHY they matter now
+3. Identifies potential trade setups or areas of interest, with clear reasoning
+4. Discusses potential risks and invalidation points
+5. Suggests specific price levels or conditions to watch for confirmation/invalidation
+
+Be direct and opinionated - if you see a compelling setup or concerning pattern, say so clearly. Focus on the most meaningful signals rather than listing everything. Explain WHY certain patterns or indicators matter in the current context, and how they interact with each other to form a complete picture.
+
+Keep the analysis as concise as possible, focusing on actionable intelligence rather than just describing indicators. If there are conflicting signals, explain which ones you believe are more reliable in the current context and why."""
 
         completion = client.chat.completions.create(
             model="gpt-4",
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a veteran technical analyst known for providing bold, insightful market analysis. Your analysis should be opinionated and actionable, backed by clear technical reasoning."
+                    "content": "You are a veteran technical analyst known for providing bold, insightful market analysis. You focus on identifying meaningful patterns and market psychology rather than just reciting indicators. Your analysis should be opinionated and actionable, backed by clear technical reasoning. When you see multiple confirming signals, you should emphasize their significance. When signals conflict, you should explain which ones you trust more and why."
                 },
                 {
                     "role": "user",
