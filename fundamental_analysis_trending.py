@@ -33,6 +33,30 @@ class APIClients:
         )
 
 # Data Fetching Functions
+def get_trending_token_ids() -> List[str]:
+    """
+    Get the IDs of currently trending tokens from CoinGecko
+    Returns a list of token IDs
+    """
+    try:
+        url = "https://api.coingecko.com/api/v3/search/trending"
+        headers = {
+            "accept": "application/json",
+            "x-cg-demo-api-key": os.getenv('COINGECKO_API_KEY')
+        }
+        
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        
+        # Extract token IDs from trending coins
+        token_ids = [coin['item']['id'] for coin in data['coins']]
+        return token_ids
+        
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching trending tokens: {e}")
+        return []
+
 def get_token_details(token_id: str) -> Optional[TokenDetails]:
     """
     Get detailed information about a token from CoinGecko
@@ -330,159 +354,21 @@ Based on our team's comprehensive analyses:
         print(f"Error generating investment report: {e}")
         return None
 
-def get_coingecko_id_from_prompt(clients: APIClients, prompt: str) -> Optional[str]:
-    """
-    Use Perplexity to identify the correct CoinGecko ID from a natural language prompt
-    Returns the CoinGecko ID if found, None otherwise
-    """
-    try:
-        # Create a prompt that asks specifically for the CoinGecko ID
-        perplexity_prompt = f"""Given this question about a cryptocurrency: "{prompt}"
-
-Please identify:
-1. Which cryptocurrency is being asked about
-2. What is its exact CoinGecko ID (the ID used in CoinGecko's API)
-
-Important notes about CoinGecko IDs:
-- They are always lowercase
-- They never contain special characters (only letters, numbers, and hyphens)
-- Common examples: 'bitcoin', 'ethereum', 'olas', 'solana'
-- For newer tokens, check their official documentation or CoinGecko listing
-
-Format your response exactly like this example:
-Cryptocurrency: Bitcoin
-CoinGecko ID: bitcoin
-
-Only provide these two lines, nothing else. Do not add any citations, references, or extra characters."""
-
-        response = clients.perplexity_client.chat.completions.create(
-            model="llama-3.1-sonar-large-128k-online",
-            messages=[{
-                "role": "system",
-                "content": "You are a cryptocurrency expert. Your task is to identify the specific cryptocurrency being discussed and provide its exact CoinGecko ID. Be precise and only return the requested format. Never add citations or references."
-            }, {
-                "role": "user",
-                "content": perplexity_prompt
-            }]
-        )
-        
-        # Parse the response to extract the CoinGecko ID
-        response_text = response.choices[0].message.content
-        for line in response_text.split('\n'):
-            if line.startswith('CoinGecko ID:'):
-                # Clean the ID: lowercase, remove special chars except hyphens
-                raw_id = line.replace('CoinGecko ID:', '').strip()
-                clean_id = ''.join(c for c in raw_id.lower() if c.isalnum() or c == '-')
-                return clean_id
-        
-        return None
-        
-    except Exception as e:
-        print(f"Error identifying CoinGecko ID: {e}")
-        return None
-
-def get_general_market_analysis(clients: APIClients) -> Optional[str]:
-    """
-    Generate a general cryptocurrency market analysis using Bitcoin as a baseline
-    Returns the analysis text
-    """
-    try:
-        # Get Bitcoin details as market baseline
-        btc_details = get_token_details('bitcoin')
-        if not btc_details:
-            print("Could not fetch Bitcoin market data for baseline analysis")
-            return None
-
-        prompt = f"""As the Chief Market Strategist at a leading digital asset investment firm, provide a comprehensive analysis of the current cryptocurrency market landscape:
-
-Market Baseline (Bitcoin):
-- Market Cap: ${btc_details['market_cap']:,.2f}
-- 24h Change: {btc_details['price_change_24h']:.2f}%
-- 14d Change: {btc_details['price_change_14d']:.2f}%
-
-Please provide a thorough market analysis covering:
-
-1. Current Market Environment
-   - Overall market sentiment
-   - Key market trends
-   - Major narratives driving the market
-   - Institutional vs retail participation
-
-2. Market Opportunities
-   - Emerging sectors in crypto
-   - Areas of innovation
-   - Potential growth catalysts
-   - Market inefficiencies
-
-3. Risk Assessment
-   - Macro risks
-   - Regulatory landscape
-   - Technical considerations
-   - Market structure concerns
-
-4. Investment Strategy
-   - Asset allocation considerations
-   - Risk management approaches
-   - Entry/exit strategies
-   - Portfolio construction advice
-
-Focus on providing actionable insights for sophisticated investors who understand the crypto market dynamics."""
-
-        response = clients.perplexity_client.chat.completions.create(
-            model="llama-3.1-sonar-large-128k-online",
-            messages=[{
-                "role": "system",
-                "content": "You are the Chief Market Strategist at a prestigious digital asset investment firm. Your analysis guides institutional investment strategies across the cryptocurrency market. Be thorough, data-driven, and focus on actionable insights."
-            }, {
-                "role": "user",
-                "content": prompt
-            }]
-        )
-        
-        return response.choices[0].message.content
-        
-    except Exception as e:
-        print(f"Error generating general market analysis: {e}")
-        return None
-
 def main():
     try:
         # Initialize API clients
         clients = APIClients()
         
-        # Get analysis prompt from command line argument or input
-        import sys
-        if len(sys.argv) > 1:
-            prompt = ' '.join(sys.argv[1:])
-        else:
-            prompt = input("Enter your cryptocurrency analysis question (e.g., 'what is the outlook for solana in the coming year'): ").strip()
-            
-        print(f"\nAnalyzing prompt: {prompt}")
-        
-        # Get CoinGecko ID from the prompt
-        coin_id = get_coingecko_id_from_prompt(clients, prompt)
-        if not coin_id:
-            print("\nCould not identify a specific cryptocurrency from your prompt.")
-            print("Generating general cryptocurrency market analysis instead...")
-            
-            analysis = get_general_market_analysis(clients)
-            if analysis:
-                print("\n=== CRYPTOCURRENCY MARKET ANALYSIS ===")
-                print(analysis)
+        # Get trending tokens
+        trending_ids = get_trending_token_ids()
+        if not trending_ids:
+            print("No trending tokens found")
             return
             
-        print(f"\nIdentified cryptocurrency with CoinGecko ID: {coin_id}")
-        print("Fetching details...")
-        
-        details = get_token_details(coin_id)
+        print("\nTop Trending Token Details:")
+        details = get_token_details(trending_ids[0])  # Get only the first token
         if not details:
-            print("\nCould not fetch token details.")
-            print("Generating general cryptocurrency market analysis instead...")
-            
-            analysis = get_general_market_analysis(clients)
-            if analysis:
-                print("\n=== CRYPTOCURRENCY MARKET ANALYSIS ===")
-                print(analysis)
+            print("Could not fetch token details")
             return
             
         # Display basic token information
