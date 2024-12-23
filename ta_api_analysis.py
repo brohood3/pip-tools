@@ -1,3 +1,8 @@
+"""
+Technical Analysis Script using TAapi and OpenAI GPT.
+Fetches technical indicators and generates AI-powered analysis for cryptocurrency pairs.
+"""
+
 import os
 import requests
 import pandas as pd
@@ -9,10 +14,9 @@ import json
 import time
 import openai
 
-# Load environment variables
+# --- Environment Setup ---
 load_dotenv()
 
-# Constants
 TAAPI_KEY = os.getenv('TAAPI_KEY')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
@@ -24,7 +28,9 @@ if not OPENAI_API_KEY:
 openai.api_key = OPENAI_API_KEY
 TAAPI_BASE_URL = "https://api.taapi.io"
 
+# --- Data Models ---
 class TechnicalIndicators(TypedDict):
+    """TypedDict defining the structure of technical indicators."""
     # Trend Indicators
     ema: Dict[str, float]  # Multiple EMAs with different periods (20, 50, 200)
     supertrend: Dict[str, Union[float, str]]  # value and valueAdvice ("long"/"short")
@@ -44,14 +50,6 @@ class TechnicalIndicators(TypedDict):
     engulfing: Dict[str, float]  # value (0, 100, or -100)
     hammer: Dict[str, float]  # value (0, 100, or -100)
     shootingstar: Dict[str, float]  # value (0, 100, or -100)
-    threewhitesoldiers: Dict[str, float]  # value (0 or 100)
-    threeblackcrows: Dict[str, float]  # value (0 or 100)
-    morningstar: Dict[str, float]  # value (0 or 100)
-    eveningstar: Dict[str, float]  # value (0 or -100)
-    abandonedbaby: Dict[str, float]  # value (0, 100, or -100)
-    darkcloudcover: Dict[str, float]  # value (0 or -100)
-    dragonflydoji: Dict[str, float]  # value (0 or 100)
-    gravestonedoji: Dict[str, float]  # value (0 or -100)
     
     # Support/Resistance & Volatility
     fibonacciretracement: Dict[str, Union[float, str, int]]  # value, trend, startPrice, endPrice, timestamps
@@ -59,9 +57,6 @@ class TechnicalIndicators(TypedDict):
     atr: Dict[str, float]  # Single value
     volume: Dict[str, float]  # Single value
     vwap: Dict[str, float]  # Single value
-    volatility: Dict[str, float]  # Single value
-    volume_sma: Dict[str, float]  # Single value
-    volume_ema: Dict[str, float]  # Single value
     
     # Volume Indicators
     ad: Dict[str, float]  # Chaikin A/D Line
@@ -69,12 +64,37 @@ class TechnicalIndicators(TypedDict):
     cmf: Dict[str, float]  # Chaikin Money Flow
     obv: Dict[str, float]  # On Balance Volume
     vosc: Dict[str, float]  # Volume Oscillator
-    vwap: Dict[str, float]  # Volume Weighted Average Price
+
+# --- API Interaction Functions ---
+def get_available_symbols() -> List[str]:
+    """Fetch available trading pairs from TAapi for Gate.io."""
+    try:
+        url = f"{TAAPI_BASE_URL}/exchange-symbols"
+        response = requests.get(url, params={
+            "secret": TAAPI_KEY,
+            "exchange": "gateio"
+        })
+        
+        if not response.ok:
+            print(f"Warning: Failed to fetch Gate.io symbols ({response.status_code}). Using BTC analysis.")
+            return []
+            
+        symbols = response.json()
+        if not symbols or not isinstance(symbols, list):
+            print("Warning: Invalid response format from symbols endpoint. Using BTC analysis.")
+            return []
+            
+        print(f"\nFetched {len(symbols)} trading pairs from Gate.io")
+        return symbols
+        
+    except Exception as e:
+        print(f"Warning: Could not fetch Gate.io symbols ({str(e)}). Using BTC analysis.")
+        return []
 
 def fetch_indicators(symbol: str, exchange: str = "gateio", interval: str = "1d") -> Optional[TechnicalIndicators]:
     """
     Fetch technical indicators using TAapi's bulk endpoint.
-    Indicators are split into batches of 20 calculations each to comply with API limits.
+    Indicators are split into batches to comply with API limits.
     """
     try:
         url = f"{TAAPI_BASE_URL}/bulk"
@@ -230,11 +250,149 @@ def fetch_indicators(symbol: str, exchange: str = "gateio", interval: str = "1d"
             print(f"Response Text: {e.response.text}")
         return None
 
+# --- Data Processing Functions ---
+def format_indicators_json(indicators: TechnicalIndicators) -> dict:
+    """Format the indicators into a structured JSON by category."""
+    return {
+        "trend_indicators": {
+            "ema": indicators.get('ema', {}),
+            "supertrend": indicators.get('supertrend', {}),
+            "adx": indicators.get('adx', {}),
+            "dmi": indicators.get('dmi', {}),
+            "psar": indicators.get('psar', {})
+        },
+        "momentum_indicators": {
+            "rsi": indicators.get('rsi', {}),
+            "macd": indicators.get('macd', {}),
+            "stochastic": indicators.get('stoch', {}),
+            "mfi": indicators.get('mfi', {}),
+            "cci": indicators.get('cci', {})
+        },
+        "pattern_signals": {
+            "doji": indicators.get('doji', {}),
+            "engulfing": indicators.get('engulfing', {}),
+            "hammer": indicators.get('hammer', {}),
+            "shooting_star": indicators.get('shootingstar', {})
+        },
+        "price_and_volume": {
+            "fibonacci": indicators.get('fibonacciretracement', {}),
+            "bollinger_bands": indicators.get('bbands', {}),
+            "atr": indicators.get('atr', {}),
+            "volume": indicators.get('volume', {}),
+            "vwap": indicators.get('vwap', {})
+        },
+        "volume_analysis": {
+            "chaikin_money_flow": indicators.get('cmf', {}),
+            "accumulation_distribution": indicators.get('ad', {}),
+            "chaikin_oscillator": indicators.get('adosc', {}),
+            "on_balance_volume": indicators.get('obv', {}),
+            "volume_oscillator": indicators.get('vosc', {})
+        }
+    }
+
+def find_best_pair(token: str, available_symbols: List[str]) -> Optional[str]:
+    """
+    Find the best trading pair for a given token.
+    Prioritizes USDT pairs, then ETH, then BTC pairs.
+    """
+    token = token.upper()
+    quote_priorities = ["USDT", "ETH", "BTC"]
+    
+    for quote in quote_priorities:
+        pair = f"{token}/{quote}"
+        if pair in available_symbols:
+            return pair
+    return None
+
+# --- Natural Language Processing Functions ---
+def parse_analysis_request(prompt: str) -> tuple[str, str]:
+    """Parse a user's analysis request to extract token and timeframe."""
+    # Convert to lowercase for easier matching
+    prompt = prompt.lower()
+    
+    # Default values
+    interval = "1d"  # Default to daily timeframe
+    
+    # Extract timeframe if specified
+    timeframes = {
+        "minute": "1m", "minutes": "1m", "1m": "1m",
+        "hourly": "1h", "hour": "1h", "1h": "1h", "1 hour": "1h",
+        "4h": "4h", "4 hour": "4h", "4 hours": "4h",
+        "daily": "1d", "day": "1d", "1d": "1d",
+        "weekly": "1w", "week": "1w", "1w": "1w"
+    }
+    
+    # Words to ignore when looking for the token
+    ignore_words = {
+        "analysis", "ta", "technical", "for", "on", "me", "give", "make", "of",
+        "timeframe", "chart", "charts", "price", "market", "markets", "trading",
+        "trend", "trends", "view", "outlook", "analysis", "analyze", "with", "focus",
+        "volume", "momentum", "trend", "patterns"
+    }
+    ignore_words.update(timeframes.keys())
+    
+    # First, find the timeframe
+    for timeframe, value in timeframes.items():
+        if timeframe in prompt:
+            interval = value
+            break
+    
+    # Then find the token - look for the last word that's not in ignore_words
+    words = prompt.split()
+    token = None
+    for word in reversed(words):
+        if word not in ignore_words:
+            token = word.upper()
+            break
+    
+    return token, interval
+
+def parse_prompt_with_llm(prompt: str) -> tuple[str, str]:
+    """Use GPT-4-mini to extract token and timeframe from natural language prompt."""
+    context = f"""Extract the cryptocurrency token name and timeframe from the following analysis request.
+Valid timeframes are: 1m, 5m, 15m, 30m, 1h, 2h, 4h, 12h, 1d, 1w
+
+Example inputs and outputs:
+Input: "give me a technical analysis for Bitcoin"
+Output: {{"token": "BTC", "timeframe": "1d"}}
+
+Input: "analyze ETH on 4 hour timeframe"
+Output: {{"token": "ETH", "timeframe": "4h"}}
+
+Input: "what's your view on NEAR for the next hour"
+Output: {{"token": "NEAR", "timeframe": "1h"}}
+
+Input: "daily analysis of Cardano"
+Output: {{"token": "ADA", "timeframe": "1d"}}
+
+Now extract from this request: "{prompt}"
+
+Respond with ONLY a JSON object containing token and timeframe. Use standard token symbols (BTC for Bitcoin, ETH for Ethereum, etc.)."""
+
+    try:
+        client = openai.OpenAI()
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",  # Using the new mini model
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant that extracts cryptocurrency analysis parameters from natural language requests."},
+                {"role": "user", "content": context}
+            ],
+            temperature=0.1,  # Low temperature for consistent outputs
+            max_tokens=100
+        )
+        
+        # Parse the response
+        result = json.loads(response.choices[0].message.content)
+        return result["token"], result["timeframe"]
+        
+    except Exception as e:
+        print(f"Error parsing prompt with LLM: {str(e)}")
+        # Fall back to basic parsing if LLM fails
+        return parse_analysis_request(prompt)
+
+# --- Analysis Generation Functions ---
 def generate_analysis(indicators: TechnicalIndicators, symbol: str, interval: str) -> str:
-    """
-    Generate an opinionated technical analysis report using GPT-4 based on the indicators.
-    Focuses on meaningful insights and actionable interpretation of the indicators.
-    """
+    """Generate an opinionated technical analysis report using GPT-4."""
     # Map intervals to human-readable time horizons
     interval_horizons = {
         "1m": "very short-term (minutes to hours)",
@@ -336,213 +494,7 @@ Remember:
         print(f"Error generating analysis: {str(e)}")
         return "Error generating analysis. Please try again."
 
-def get_available_symbols() -> List[str]:
-    """
-    Fetch available trading pairs from TAapi for Gate.io.
-    Gate.io offers 3,838+ trading pairs with accurate real-time data.
-    """
-    try:
-        url = f"{TAAPI_BASE_URL}/exchange-symbols"
-        response = requests.get(url, params={
-            "secret": TAAPI_KEY,
-            "exchange": "gateio"
-        })
-        
-        if not response.ok:
-            print(f"Warning: Failed to fetch Gate.io symbols ({response.status_code}). Using BTC analysis.")
-            return []
-            
-        symbols = response.json()
-        if not symbols or not isinstance(symbols, list):
-            print("Warning: Invalid response format from symbols endpoint. Using BTC analysis.")
-            return []
-            
-        print(f"\nFetched {len(symbols)} trading pairs from Gate.io")
-        return symbols
-        
-    except Exception as e:
-        print(f"Warning: Could not fetch Gate.io symbols ({str(e)}). Using BTC analysis.")
-        return []
-
-def find_best_pair(token: str, available_symbols: List[str]) -> Optional[str]:
-    """
-    Find the best trading pair for a given token on Gate.io.
-    Prioritizes USDT pairs, then ETH, then BTC pairs.
-    Returns None if no suitable pair is found.
-    """
-    token = token.upper()
-    # Priority order for quote currencies on Gate.io
-    quote_priorities = ["USDT", "ETH", "BTC"]
-    
-    for quote in quote_priorities:
-        pair = f"{token}/{quote}"
-        if pair in available_symbols:
-            return pair
-    return None
-
-def parse_analysis_request(prompt: str) -> tuple[str, str]:
-    """
-    Parse a user's analysis request to extract the token and timeframe.
-    Returns (token, interval)
-    """
-    # Convert to lowercase for easier matching
-    prompt = prompt.lower()
-    
-    # Default values
-    interval = "1d"  # Default to daily timeframe
-    
-    # Extract timeframe if specified
-    timeframes = {
-        "minute": "1m", "minutes": "1m", "1m": "1m",
-        "hourly": "1h", "hour": "1h", "1h": "1h", "1 hour": "1h",
-        "4h": "4h", "4 hour": "4h", "4 hours": "4h",
-        "daily": "1d", "day": "1d", "1d": "1d",
-        "weekly": "1w", "week": "1w", "1w": "1w"
-    }
-    
-    # Words to ignore when looking for the token
-    ignore_words = {
-        "analysis", "ta", "technical", "for", "on", "me", "give", "make", "of",
-        "timeframe", "chart", "charts", "price", "market", "markets", "trading",
-        "trend", "trends", "view", "outlook", "analysis", "analyze"
-    }
-    ignore_words.update(timeframes.keys())
-    
-    # First, find the timeframe
-    for timeframe, value in timeframes.items():
-        if timeframe in prompt:
-            interval = value
-            break
-    
-    # Then find the token - look for the last word that's not in ignore_words
-    words = prompt.split()
-    token = None
-    for word in reversed(words):
-        if word not in ignore_words:
-            token = word.upper()
-            break
-    
-    return token, interval
-
-def parse_prompt_with_llm(prompt: str) -> tuple[str, str]:
-    """
-    Use GPT-4-mini to extract the token and timeframe from a natural language prompt.
-    Returns (token, interval)
-    """
-    context = f"""Extract the cryptocurrency token name and timeframe from the following analysis request.
-Valid timeframes are: 1m, 5m, 15m, 30m, 1h, 2h, 4h, 12h, 1d, 1w
-
-Example inputs and outputs:
-Input: "give me a technical analysis for Bitcoin"
-Output: {{"token": "BTC", "timeframe": "1d"}}
-
-Input: "analyze ETH on 4 hour timeframe"
-Output: {{"token": "ETH", "timeframe": "4h"}}
-
-Input: "what's your view on NEAR for the next hour"
-Output: {{"token": "NEAR", "timeframe": "1h"}}
-
-Input: "daily analysis of Cardano"
-Output: {{"token": "ADA", "timeframe": "1d"}}
-
-Now extract from this request: "{prompt}"
-
-Respond with ONLY a JSON object containing token and timeframe. Use standard token symbols (BTC for Bitcoin, ETH for Ethereum, etc.)."""
-
-    try:
-        client = openai.OpenAI()
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",  # Using the new mini model
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant that extracts cryptocurrency analysis parameters from natural language requests."},
-                {"role": "user", "content": context}
-            ],
-            temperature=0.1,  # Low temperature for consistent outputs
-            max_tokens=100
-        )
-        
-        # Parse the response
-        result = json.loads(response.choices[0].message.content)
-        return result["token"], result["timeframe"]
-        
-    except Exception as e:
-        print(f"Error parsing prompt with LLM: {str(e)}")
-        # Fall back to basic parsing if LLM fails
-        return parse_analysis_request(prompt)
-
-def format_indicators_json(indicators: TechnicalIndicators) -> dict:
-    """Format the indicators into a structured JSON by category."""
-    return {
-        "trend_indicators": {
-            "ema": {
-                "ema20": indicators['ema']['period_20'],
-                "ema50": indicators['ema']['period_50'],
-                "ema200": indicators['ema']['period_200']
-            },
-            "supertrend": {
-                "value": indicators['supertrend']['value'],
-                "signal": indicators['supertrend']['valueAdvice']
-            },
-            "adx": indicators['adx']['value'],
-            "dmi": {
-                "adx": indicators['dmi']['adx'],
-                "plus_di": indicators['dmi']['pdi'],
-                "minus_di": indicators['dmi']['mdi']
-            },
-            "psar": indicators['psar']['value']
-        },
-        "momentum_indicators": {
-            "rsi": indicators['rsi']['value'],
-            "macd": {
-                "macd_line": indicators['macd']['valueMACD'],
-                "signal_line": indicators['macd']['valueMACDSignal'],
-                "histogram": indicators['macd']['valueMACDHist']
-            },
-            "stochastic": {
-                "k_line": indicators['stoch']['valueK'],
-                "d_line": indicators['stoch']['valueD']
-            },
-            "mfi": indicators['mfi']['value'],
-            "cci": indicators['cci']['value']
-        },
-        "pattern_signals": {
-            "doji": indicators['doji']['value'],
-            "engulfing": indicators['engulfing']['value'],
-            "hammer": indicators['hammer']['value'],
-            "shooting_star": indicators['shootingstar']['value']
-        },
-        "price_structure": {
-            "fibonacci": {
-                "value": indicators['fibonacciretracement']['value'],
-                "trend": indicators['fibonacciretracement']['trend'],
-                "start_price": indicators['fibonacciretracement']['startPrice'],
-                "end_price": indicators['fibonacciretracement']['endPrice']
-            },
-            "bollinger_bands": {
-                "upper": indicators['bbands']['valueUpperBand'],
-                "middle": indicators['bbands']['valueMiddleBand'],
-                "lower": indicators['bbands']['valueLowerBand']
-            },
-            "atr": indicators['atr']['value']
-        },
-        "volume_analysis": {
-            "current_volume": indicators['volume']['value'],
-            "chaikin_money_flow": indicators['cmf']['value'],
-            "accumulation_distribution": {
-                "line": indicators['ad']['value'],
-                "oscillator": indicators['adosc']['value']
-            },
-            "on_balance_volume": indicators['obv']['value'],
-            "volume_oscillator": indicators['vosc']['value'],
-            "vwap": indicators['vwap']['value']
-        },
-        "volume_interpretation": {
-            "money_flow": "positive" if indicators['cmf']['value'] > 0 else "negative",
-            "volume_trend": "increasing" if indicators['vosc']['value'] > 0 else "decreasing",
-            "price_volume_alignment": "confirming" if (indicators['obv']['value'] > 0) == (indicators['adosc']['value'] > 0) else "diverging"
-        }
-    }
-
+# --- Main Execution Functions ---
 def run_analysis(prompt: str) -> str:
     """Run technical analysis and return JSON output."""
     available_symbols = get_available_symbols()
@@ -608,6 +560,7 @@ def run_default_analysis(requested_token: str = None) -> str:
     
     return json.dumps(output, indent=2)
 
+# --- Main Entry Point ---
 if __name__ == "__main__":
     import sys
     
