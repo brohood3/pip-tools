@@ -23,7 +23,7 @@ def get_dune_results(query_id: int, api_key: str) -> Optional[Dict[Any, Any]]:
         print(f"Error fetching Dune results: {e}")
         return None
 
-def generate_summary(data: Dict[Any, Any], openai_api_key: str) -> str:
+def generate_summary(data: Dict[Any, Any], openai_api_key: str, query_description: str) -> str:
     """Generate a summary of the Dune query results using GPT"""
     client = OpenAI(api_key=openai_api_key)
     
@@ -34,8 +34,8 @@ def generate_summary(data: Dict[Any, Any], openai_api_key: str) -> str:
         # Convert data to a readable format
         formatted_data = json.dumps(result_data, indent=2)
         
-        prompt = f"""Please analyze the following blockchain data and provide a clear, 
-        concise summary of the key findings and trends:
+        prompt = f"""Please analyze the following blockchain data from a query that {query_description}
+        and provide a clear, concise summary of the key findings and trends:
 
         {formatted_data}
 
@@ -46,7 +46,7 @@ def generate_summary(data: Dict[Any, Any], openai_api_key: str) -> str:
         """
 
         response = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-4o",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=500,
             temperature=0.7
@@ -66,9 +66,10 @@ def main():
         print("Please set DUNE_API_KEY and OPENAI_API_KEY environment variables")
         return
 
-    # Get query ID from user
+    # Get query ID and description from user
     try:
         query_id = int(input("Enter Dune query ID: ").strip())
+        query_description = input("Enter a description of what this query analyzes: ").strip()
     except ValueError:
         print("Please enter a valid number")
         return
@@ -79,7 +80,7 @@ def main():
         return
 
     # Generate summary using GPT
-    summary = generate_summary(results, openai_api_key)
+    summary = generate_summary(results, openai_api_key, query_description)
     
     # Print results
     print("\n=== Query Results ===")
