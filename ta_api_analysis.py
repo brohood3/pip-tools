@@ -348,7 +348,7 @@ def parse_analysis_request(prompt: str) -> tuple[str, str]:
     return token, interval
 
 def parse_prompt_with_llm(prompt: str) -> tuple[str, str]:
-    """Use GPT-4-mini to extract token and timeframe from natural language prompt."""
+    """Use GPT-4o-mini to extract token and timeframe from natural language prompt."""
     context = f"""Extract the cryptocurrency token name and timeframe from the following analysis request.
 Valid timeframes are: 1m, 5m, 15m, 30m, 1h, 2h, 4h, 12h, 1d, 1w
 
@@ -367,22 +367,38 @@ Output: {{"token": "ADA", "timeframe": "1d"}}
 
 Now extract from this request: "{prompt}"
 
-Respond with ONLY a JSON object containing token and timeframe. Use standard token symbols (BTC for Bitcoin, ETH for Ethereum, etc.)."""
+IMPORTANT: Respond with ONLY the raw JSON object. Do not include markdown formatting, code blocks, or any other text. The response should start with {{ and end with }}."""
 
     try:
         client = openai.OpenAI()
         response = client.chat.completions.create(
             model="gpt-4o-mini",  # Using the new mini model
             messages=[
-                {"role": "system", "content": "You are a helpful assistant that extracts cryptocurrency analysis parameters from natural language requests."},
+                {"role": "system", "content": "You are a helpful assistant that extracts cryptocurrency analysis parameters from natural language requests. You respond with raw JSON only."},
                 {"role": "user", "content": context}
             ],
             temperature=0.1,  # Low temperature for consistent outputs
             max_tokens=100
         )
         
+        # Print raw LLM output
+        raw_output = response.choices[0].message.content
+        print(f"\nRaw LLM Output: {raw_output}")
+        
+        # Clean up the response - remove any markdown code block syntax
+        cleaned_output = raw_output.strip()
+        if cleaned_output.startswith("```"):
+            cleaned_output = cleaned_output.split("\n", 1)[1]  # Remove first line
+        if cleaned_output.endswith("```"):
+            cleaned_output = cleaned_output.rsplit("\n", 1)[0]  # Remove last line
+        cleaned_output = cleaned_output.strip()
+        if cleaned_output.startswith("json"):
+            cleaned_output = cleaned_output[4:].strip()  # Remove "json" language specifier
+            
+        print(f"\nCleaned Output: {cleaned_output}")
+        
         # Parse the response
-        result = json.loads(response.choices[0].message.content)
+        result = json.loads(cleaned_output)
         return result["token"], result["timeframe"]
         
     except Exception as e:
