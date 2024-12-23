@@ -2,26 +2,38 @@
 .env
 .env.*
 *.env
-
-# Virtual Environment
-venv/
-.venv/
-ENV/
+.env.local
+.env.development
+.env.test
+.env.production
 
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
+.Python
+*.so
+.pytest_cache/
 
-# IDE specific files
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv/
+
+# IDE
 .idea/
 .vscode/
 *.swp
 *.swo
 
-# OS specific files
+# OS
 .DS_Store
 Thumbs.db
+
+# Logs
+*.log
+.cache/
 
 # Local development
 *.log
