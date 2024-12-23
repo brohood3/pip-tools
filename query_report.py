@@ -13,7 +13,7 @@ def get_dune_results(query_id: int, api_key: str) -> Optional[Dict[Any, Any]]:
         # Convert ResultsResponse to dictionary
         if hasattr(result, 'result'):
             # Limit to 50 rows and convert to dictionary
-            rows = result.result.rows[:50] if len(result.result.rows) > 50 else result.result.rows
+            rows = result.result.rows[:100] if len(result.result.rows) > 50 else result.result.rows
             return {'result': rows}
         else:
             print("Invalid or empty response from Dune API")
@@ -24,38 +24,35 @@ def get_dune_results(query_id: int, api_key: str) -> Optional[Dict[Any, Any]]:
         return None
 
 def generate_summary(data: Dict[Any, Any], openai_api_key: str, query_description: str) -> str:
-    """Generate a summary of the Dune query results using GPT"""
+    """Generate an opinionated analysis of the Dune query results using GPT"""
     client = OpenAI(api_key=openai_api_key)
     
     try:
-        # Extract just the result data if it exists
         result_data = data.get('result', data)
-        
-        # Convert data to a readable format
         formatted_data = json.dumps(result_data, indent=2)
         
-        prompt = f"""Please analyze the following blockchain data from a query that {query_description}
-        and provide a clear, concise summary of the key findings and trends:
-
+        prompt = f"""You are a blockchain analyst providing clear and objective insights.
+        Analyze this blockchain data from a query that {query_description}.
+        
         {formatted_data}
 
-        Please include:
+        Provide a brief analysis that includes:
         1. Key metrics and their significance
-        2. Any notable trends or patterns
+        2. Notable trends or patterns
         3. Potential implications
+
+        Keep it concise (3-4 sentences) and focus on the data.
         """
 
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=500,
-            temperature=0.7
+            temperature=0.5
         )
         return response.choices[0].message.content
-    except json.JSONDecodeError as e:
-        return f"Error formatting data: {e}"
     except Exception as e:
-        return f"Error generating summary: {e}"
+        return f"Error generating analysis: {e}"
 
 def main():
     # Load API keys from environment variables
@@ -80,13 +77,11 @@ def main():
         return
 
     # Generate summary using GPT
-    summary = generate_summary(results, openai_api_key, query_description)
+    analysis = generate_summary(results, openai_api_key, query_description)
     
-    # Print results
-    print("\n=== Query Results ===")
-    print(json.dumps(results, indent=2))
-    print("\n=== AI Summary ===")
-    print(summary)
+    # Print only the analysis
+    print("\n=== Analysis ===")
+    print(analysis)
 
 if __name__ == "__main__":
     main()
