@@ -470,24 +470,86 @@ Respond with ONLY a JSON object containing token and timeframe. Use standard tok
         # Fall back to basic parsing if LLM fails
         return parse_analysis_request(prompt)
 
+def format_indicators_json(indicators: TechnicalIndicators) -> dict:
+    """Format the indicators into a structured JSON by category."""
+    return {
+        "trend_indicators": {
+            "ema": {
+                "ema20": indicators['ema']['period_20'],
+                "ema50": indicators['ema']['period_50'],
+                "ema200": indicators['ema']['period_200']
+            },
+            "supertrend": {
+                "value": indicators['supertrend']['value'],
+                "signal": indicators['supertrend']['valueAdvice']
+            },
+            "adx": indicators['adx']['value'],
+            "dmi": {
+                "adx": indicators['dmi']['adx'],
+                "plus_di": indicators['dmi']['pdi'],
+                "minus_di": indicators['dmi']['mdi']
+            },
+            "psar": indicators['psar']['value']
+        },
+        "momentum_indicators": {
+            "rsi": indicators['rsi']['value'],
+            "macd": {
+                "macd_line": indicators['macd']['valueMACD'],
+                "signal_line": indicators['macd']['valueMACDSignal'],
+                "histogram": indicators['macd']['valueMACDHist']
+            },
+            "stochastic": {
+                "k_line": indicators['stoch']['valueK'],
+                "d_line": indicators['stoch']['valueD']
+            },
+            "mfi": indicators['mfi']['value'],
+            "cci": indicators['cci']['value']
+        },
+        "pattern_signals": {
+            "doji": indicators['doji']['value'],
+            "engulfing": indicators['engulfing']['value'],
+            "hammer": indicators['hammer']['value'],
+            "shooting_star": indicators['shootingstar']['value']
+        },
+        "price_structure": {
+            "fibonacci": {
+                "value": indicators['fibonacciretracement']['value'],
+                "trend": indicators['fibonacciretracement']['trend'],
+                "start_price": indicators['fibonacciretracement']['startPrice'],
+                "end_price": indicators['fibonacciretracement']['endPrice']
+            },
+            "bollinger_bands": {
+                "upper": indicators['bbands']['valueUpperBand'],
+                "middle": indicators['bbands']['valueMiddleBand'],
+                "lower": indicators['bbands']['valueLowerBand']
+            },
+            "atr": indicators['atr']['value']
+        },
+        "volume_analysis": {
+            "current_volume": indicators['volume']['value'],
+            "chaikin_money_flow": indicators['cmf']['value'],
+            "accumulation_distribution": {
+                "line": indicators['ad']['value'],
+                "oscillator": indicators['adosc']['value']
+            },
+            "on_balance_volume": indicators['obv']['value'],
+            "volume_oscillator": indicators['vosc']['value'],
+            "vwap": indicators['vwap']['value']
+        },
+        "volume_interpretation": {
+            "money_flow": "positive" if indicators['cmf']['value'] > 0 else "negative",
+            "volume_trend": "increasing" if indicators['vosc']['value'] > 0 else "decreasing",
+            "price_volume_alignment": "confirming" if (indicators['obv']['value'] > 0) == (indicators['adosc']['value'] > 0) else "diverging"
+        }
+    }
+
 def run_analysis(prompt: str) -> str:
-    """
-    Run technical analysis based on a user prompt.
-    Example prompts:
-    - "give me a ta analysis on Near"
-    - "technical analysis for ETH"
-    - "4h analysis for Bitcoin"
-    - "what's your view on cardano for the next hour"
-    - "analyze solana's daily chart"
-    """
-    # Get available symbols
+    """Run technical analysis and return JSON output."""
     available_symbols = get_available_symbols()
     if not available_symbols:
-        print("Warning: Could not fetch available symbols. Using BTC analysis.")
         return run_default_analysis()
     
     try:
-        # Try to parse the prompt using GPT first
         token, interval = parse_prompt_with_llm(prompt)
         print(f"\nExtracted Parameters:")
         print(f"Token: {token}")
@@ -497,60 +559,59 @@ def run_analysis(prompt: str) -> str:
         token, interval = parse_analysis_request(prompt)
     
     if not token:
-        print("Could not identify token in prompt. Using BTC analysis.")
         return run_default_analysis()
     
-    # Find the best pair for the token
     pair = find_best_pair(token, available_symbols)
     
     if not pair:
-        print(f"No trading pair found for {token} on Gate.io. Providing general market analysis using BTC.")
         return run_default_analysis(requested_token=token)
     
-    # Fetch and analyze the data
     indicators = fetch_indicators(pair, interval=interval)
     if not indicators:
-        print(f"Error fetching data for {pair}. Providing general market analysis using BTC.")
         return run_default_analysis(requested_token=token)
     
-    return generate_analysis(indicators, pair, interval)
+    analysis = generate_analysis(indicators, pair, interval)
+    
+    # Create the final JSON output
+    output = {
+        "metadata": {
+            "token": token,
+            "pair": pair,
+            "interval": interval,
+            "timestamp": datetime.now().isoformat(),
+        },
+        "technical_indicators": format_indicators_json(indicators),
+        "ai_analysis": analysis
+    }
+    
+    return json.dumps(output, indent=2)
 
 def run_default_analysis(requested_token: str = None) -> str:
-    """Run default analysis using BTC/USDT when specific pair is not available."""
-    intro = ""
-    if requested_token:
-        intro = f"""
-Note: No trading pair found for {requested_token} on Gate.io. 
-
-Providing a general market analysis using Bitcoin (BTC/USDT) as a proxy for overall crypto market conditions.
-This analysis can be useful because:
-1. Bitcoin often leads market trends and influences the entire crypto market
-2. Most altcoins have high correlation with Bitcoin, especially during major market moves
-3. The analysis provides insight into general market sentiment and conditions
-
-However, please note that individual tokens may deviate from Bitcoin's behavior due to:
-- Project-specific developments
-- Token-specific tokenomics
-- Different market dynamics and liquidity
-- Varying correlation levels during different market phases
-
-Analysis follows below:
-{'='*50}
-
-"""
-    
+    """Run default analysis using BTC/USDT and return JSON output."""
     indicators = fetch_indicators("BTC/USDT", interval="1d")
     if not indicators:
-        return "Error: Could not fetch market data. Please try again later."
+        return json.dumps({"error": "Could not fetch market data. Please try again later."})
     
     analysis = generate_analysis(indicators, "BTC/USDT", "1d")
-    return intro + analysis
+    
+    output = {
+        "metadata": {
+            "note": f"No trading pair found for {requested_token}. Using BTC as market proxy." if requested_token else "Using default BTC analysis",
+            "token": "BTC",
+            "pair": "BTC/USDT",
+            "interval": "1d",
+            "timestamp": datetime.now().isoformat(),
+        },
+        "technical_indicators": format_indicators_json(indicators),
+        "ai_analysis": analysis
+    }
+    
+    return json.dumps(output, indent=2)
 
 if __name__ == "__main__":
     import sys
     
     if len(sys.argv) > 1:
-        # Join all arguments to form the prompt
         prompt = " ".join(sys.argv[1:])
     else:
         prompt = input("Enter your analysis request (e.g., 'ta analysis for NEAR'): ")
@@ -560,5 +621,5 @@ if __name__ == "__main__":
     print(f"Prompt: {prompt}")
     print(f"{'='*50}")
     
-    analysis = run_analysis(prompt)
-    print(analysis)
+    analysis_json = run_analysis(prompt)
+    print(analysis_json)
