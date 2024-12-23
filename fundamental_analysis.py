@@ -3,6 +3,7 @@ import os
 from typing import List, Dict, Optional, TypedDict
 from openai import OpenAI
 
+# Type Definitions
 class TokenDetails(TypedDict):
     name: str
     symbol: str
@@ -16,6 +17,22 @@ class TokenDetails(TypedDict):
     twitter_followers: int
     links: Dict[str, List[str]]
 
+class APIClients:
+    def __init__(self):
+        self.coingecko_api_key = os.getenv('COINGECKO_API_KEY')
+        self.openai_api_key = os.getenv('OPENAI_API_KEY')
+        self.perplexity_api_key = os.getenv('PERPLEXITY_API_KEY')
+        
+        if not all([self.coingecko_api_key, self.openai_api_key, self.perplexity_api_key]):
+            raise ValueError("Missing required API keys in environment variables")
+            
+        self.openai_client = OpenAI()
+        self.perplexity_client = OpenAI(
+            api_key=self.perplexity_api_key,
+            base_url="https://api.perplexity.ai"
+        )
+
+# Data Fetching Functions
 def get_trending_token_ids() -> List[str]:
     """
     Get the IDs of currently trending tokens from CoinGecko
@@ -82,14 +99,13 @@ def get_token_details(token_id: str) -> Optional[TokenDetails]:
         print(f"Error fetching token details: {e}")
         return None
 
-def get_investment_analysis(token_details: TokenDetails) -> Optional[str]:
+# Analysis Generation Functions
+def get_investment_analysis(clients: APIClients, token_details: TokenDetails) -> Optional[str]:
     """
     Get focused tokenomics and market sentiment analysis using GPT
     Returns the raw analysis text
     """
     try:
-        client = OpenAI()
-        
         prompt = f"""As a seasoned tokenomics expert at a top crypto venture capital firm, analyze this token for our institutional investors:
 
 Token: {token_details['name']} ({token_details['symbol']})
@@ -120,7 +136,7 @@ Please provide your VC firm's analysis in the following format:
    - Analyze social metrics impact (Twitter following of {token_details['twitter_followers']:,})
    - Compare market cap to social engagement ratio"""
 
-        completion = client.chat.completions.create(
+        completion = clients.openai_client.chat.completions.create(
             model="gpt-4o",
             messages=[
                 {
@@ -141,18 +157,12 @@ Please provide your VC firm's analysis in the following format:
         print(f"Error generating analysis: {e}")
         return None
 
-def get_project_research(token_details: TokenDetails) -> Optional[str]:
+def get_project_research(clients: APIClients, token_details: TokenDetails) -> Optional[str]:
     """
     Research the project using Perplexity API to analyze links and provide insights
     Returns the raw research text
     """
     try:
-        # Initialize OpenAI client with Perplexity base URL
-        client = OpenAI(
-            api_key=os.getenv('PERPLEXITY_API_KEY'),
-            base_url="https://api.perplexity.ai"
-        )
-        
         # Prepare relevant links for research
         research_links = []
         important_link_types = ['homepage', 'blockchain_site', 'whitepaper', 'announcement_url', 'twitter_screen_name', 'telegram_channel_identifier', 'github_url', 'youtube_url', 'discord_url', 'linkedin_url', 'facebook_url', 'instagram_url', 'reddit_url', 'telegram_url', 'tiktok_url', 'website', 'blog', 'telegram', 'discord', 'reddit', 'linkedin', 'facebook', 'instagram', 'tiktok', 'youtube']
@@ -199,10 +209,9 @@ Please provide an institutional-grade analysis covering:
    - Latest developments
    - Roadmap milestones
    - Upcoming features or releases
-
 """
 
-        response = client.chat.completions.create(
+        response = clients.perplexity_client.chat.completions.create(
             model="llama-3.1-sonar-large-128k-online",
             messages=[{
                 "role": "system",
@@ -219,18 +228,12 @@ Please provide an institutional-grade analysis covering:
         print(f"Error generating project research: {e}")
         return None
 
-def get_market_context_analysis(token_details: TokenDetails) -> Optional[str]:
+def get_market_context_analysis(clients: APIClients, token_details: TokenDetails) -> Optional[str]:
     """
     Analyze external market factors, narratives, and competitive landscape using Perplexity
     Returns the raw analysis text
     """
     try:
-        # Initialize OpenAI client with Perplexity base URL
-        client = OpenAI(
-            api_key=os.getenv('PERPLEXITY_API_KEY'),
-            base_url="https://api.perplexity.ai"
-        )
-        
         prompt = f"""As the Chief Market Strategist at a leading digital asset investment firm, provide strategic market intelligence for our institutional clients:
 
 Token: {token_details['name']} ({token_details['symbol']})
@@ -265,7 +268,7 @@ Please provide your strategic market assessment covering:
 
 Please use real-time market data and recent developments in your analysis."""
 
-        response = client.chat.completions.create(
+        response = clients.perplexity_client.chat.completions.create(
             model="llama-3.1-sonar-large-128k-online",
             messages=[{
                 "role": "system",
@@ -282,14 +285,13 @@ Please use real-time market data and recent developments in your analysis."""
         print(f"Error generating market context analysis: {e}")
         return None
 
-def generate_investment_report(token_details: TokenDetails, tokenomics_analysis: str, project_research: str, market_context: str) -> Optional[str]:
+# Report Generation Function
+def generate_investment_report(clients: APIClients, token_details: TokenDetails, tokenomics_analysis: str, project_research: str, market_context: str) -> Optional[str]:
     """
     Generate a concise investment report aggregating all analyses
     Returns the formatted report text
     """
     try:
-        client = OpenAI()  # Use standard OpenAI client
-        
         prompt = f"""As the Investment Committee Chair at a leading crypto investment firm, synthesize our research team's findings into an executive summary for the board:
 
 Token: {token_details['name']} ({token_details['symbol']})
@@ -332,34 +334,9 @@ Based on our team's comprehensive analyses:
    - Entry strategy
    - Position sizing considerations
    - Key metrics to monitor
-   - Time horizon
+   - Time horizon"""
 
-Please provide a decisive investment recommendation in the following format:
-
-1. Investment Outlook (2-3 sentences)
-   - Overall sentiment
-   - Key market position
-   - Growth potential
-
-2. Key Catalysts (3-4 bullet points)
-   - Upcoming developments
-   - Market opportunities
-   - Competitive advantages
-
-3. Risk Factors (3-4 bullet points)
-   - Market risks
-   - Project-specific risks
-   - External threats
-
-4. Investment Recommendations
-   - Entry strategy
-   - Position sizing considerations
-   - Key metrics to monitor
-   - Time horizon
-
-Keep the analysis concise and actionable, focusing on the most important factors for investment decision-making."""
-
-        completion = client.chat.completions.create(
+        completion = clients.openai_client.chat.completions.create(
             model="gpt-4o",
             messages=[{
                 "role": "system",
@@ -377,64 +354,85 @@ Keep the analysis concise and actionable, focusing on the most important factors
         print(f"Error generating investment report: {e}")
         return None
 
-if __name__ == "__main__":
-    trending_ids = get_trending_token_ids()
-    if trending_ids:
+def main():
+    try:
+        # Initialize API clients
+        clients = APIClients()
+        
+        # Get trending tokens
+        trending_ids = get_trending_token_ids()
+        if not trending_ids:
+            print("No trending tokens found")
+            return
+            
         print("\nTop Trending Token Details:")
         details = get_token_details(trending_ids[0])  # Get only the first token
-        if details:
-            print(f"\n{details['name']} ({details['symbol']})")
-            print(f"Chain: {details['chain']}")
-            print(f"Contract Address: {details['contract_address']}")
-            print(f"Market Cap: ${details['market_cap']:,.2f}")
-            print(f"Market Cap/FDV Ratio: {details['market_cap_fdv_ratio']:.2f}")
-            print(f"24h Price Change: {details['price_change_24h']:.2f}%")
-            print(f"14d Price Change: {details['price_change_14d']:.2f}%")
-            print(f"Twitter Followers: {details['twitter_followers']:,}")
+        if not details:
+            print("Could not fetch token details")
+            return
             
-            print("\nLinks:")
-            for link_type, urls in details['links'].items():
-                if urls and isinstance(urls, list):
-                    valid_urls = [url for url in urls if url]
-                    if valid_urls:
-                        print(f"{link_type.replace('_', ' ').title()}:")
-                        for url in valid_urls:
-                            print(f"- {url}")
-                elif urls and isinstance(urls, str):
-                    print(f"{link_type.replace('_', ' ').title()}: {urls}")
-                elif isinstance(urls, dict) and urls:
+        # Display basic token information
+        print(f"\n{details['name']} ({details['symbol']})")
+        print(f"Chain: {details['chain']}")
+        print(f"Contract Address: {details['contract_address']}")
+        print(f"Market Cap: ${details['market_cap']:,.2f}")
+        print(f"Market Cap/FDV Ratio: {details['market_cap_fdv_ratio']:.2f}")
+        print(f"24h Price Change: {details['price_change_24h']:.2f}%")
+        print(f"14d Price Change: {details['price_change_14d']:.2f}%")
+        print(f"Twitter Followers: {details['twitter_followers']:,}")
+        
+        # Display links
+        print("\nLinks:")
+        for link_type, urls in details['links'].items():
+            if urls and isinstance(urls, list):
+                valid_urls = [url for url in urls if url]
+                if valid_urls:
                     print(f"{link_type.replace('_', ' ').title()}:")
-                    for sub_type, sub_urls in urls.items():
-                        if sub_urls:
-                            print(f"  {sub_type.title()}:")
-                            for url in sub_urls:
-                                if url:
-                                    print(f"  - {url}")
+                    for url in valid_urls:
+                        print(f"- {url}")
+            elif urls and isinstance(urls, str):
+                print(f"{link_type.replace('_', ' ').title()}: {urls}")
+            elif isinstance(urls, dict) and urls:
+                print(f"{link_type.replace('_', ' ').title()}:")
+                for sub_type, sub_urls in urls.items():
+                    if sub_urls:
+                        print(f"  {sub_type.title()}:")
+                        for url in sub_urls:
+                            if url:
+                                print(f"  - {url}")
+        
+        # Display description
+        print("\nDescription:")
+        print(details['description'][:500] + "..." if len(details['description']) > 500 else details['description'])
+        
+        # Generate analyses
+        print("\nGenerating Tokenomics & Market Analysis...")
+        tokenomics_analysis = get_investment_analysis(clients, details)
+        if tokenomics_analysis:
+            print("\nTokenomics & Market Analysis:")
+            print(tokenomics_analysis)
+        
+        print("\nResearching Project Details...")
+        project_research = get_project_research(clients, details)
+        if project_research:
+            print("\nProject Research:")
+            print(project_research)
             
-            print("\nDescription:")
-            print(details['description'][:500] + "..." if len(details['description']) > 500 else details['description'])
+        print("\nAnalyzing Market Context & Competition...")
+        market_context = get_market_context_analysis(clients, details)
+        if market_context:
+            print("\nMarket Context Analysis:")
+            print(market_context)
             
-            print("\nGenerating Tokenomics & Market Analysis...")
-            tokenomics_analysis = get_investment_analysis(details)
-            if tokenomics_analysis:
-                print("\nTokenomics & Market Analysis:")
-                print(tokenomics_analysis)
-            
-            print("\nResearching Project Details...")
-            project_research = get_project_research(details)
-            if project_research:
-                print("\nProject Research:")
-                print(project_research)
+        if all([tokenomics_analysis, project_research, market_context]):
+            print("\nGenerating Investment Report...")
+            report = generate_investment_report(clients, details, tokenomics_analysis, project_research, market_context)
+            if report:
+                print("\n=== INVESTMENT REPORT ===")
+                print(report)
                 
-            print("\nAnalyzing Market Context & Competition...")
-            market_context = get_market_context_analysis(details)
-            if market_context:
-                print("\nMarket Context Analysis:")
-                print(market_context)
-                
-            if tokenomics_analysis and project_research and market_context:
-                print("\nGenerating Investment Report...")
-                report = generate_investment_report(details, tokenomics_analysis, project_research, market_context)
-                if report:
-                    print("\n=== INVESTMENT REPORT ===")
-                    print(report)
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+if __name__ == "__main__":
+    main()
