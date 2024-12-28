@@ -95,6 +95,7 @@ def fetch_indicators(symbol: str, exchange: str = "gateio", interval: str = "1d"
     """
     Fetch technical indicators using TAapi's bulk endpoint.
     Indicators are split into batches to comply with API limits.
+    Returns None only if fewer than 5 valid indicators are available.
     """
     try:
         url = f"{TAAPI_BASE_URL}/bulk"
@@ -165,10 +166,11 @@ def fetch_indicators(symbol: str, exchange: str = "gateio", interval: str = "1d"
             {"indicator": "volume"}  # Current volume for comparison
         ]
         
-        # Initialize the result dictionary
+        # Initialize the result dictionary and valid indicator counter
         result = {}
+        valid_indicators = 0
         
-        # Function to process a batch
+        # Function to process a batch and count valid indicators
         def process_batch(indicators):
             payload = {
                 "secret": TAAPI_KEY,
@@ -202,42 +204,65 @@ def fetch_indicators(symbol: str, exchange: str = "gateio", interval: str = "1d"
         # Process first batch
         print("\nProcessing first batch of indicators...")
         batch1_data = process_batch(batch1)
-        if not batch1_data:
-            return None
+        if batch1_data:
+            for indicator_data in batch1_data:
+                if indicator_data.get("result") and not indicator_data.get("result").get("error"):
+                    # Special handling for EMA with different periods
+                    if indicator_data["indicator"] == "ema":
+                        if "ema" not in result:
+                            result["ema"] = {}
+                        # Extract period from the ID
+                        period = indicator_data["id"].split("_")[-2]
+                        result["ema"][f"period_{period}"] = indicator_data["result"].get("value")
+                    else:
+                        valid_indicators += 1
+                        result[indicator_data["indicator"]] = indicator_data["result"]
         
         # Process second batch
         print("\nProcessing second batch of indicators...")
         batch2_data = process_batch(batch2)
-        if not batch2_data:
-            return None
+        if batch2_data:
+            for indicator_data in batch2_data:
+                if indicator_data.get("result") and not indicator_data.get("result").get("error"):
+                    # Special handling for EMA with different periods
+                    if indicator_data["indicator"] == "ema":
+                        if "ema" not in result:
+                            result["ema"] = {}
+                        # Extract period from the ID
+                        period = indicator_data["id"].split("_")[-2]
+                        result["ema"][f"period_{period}"] = indicator_data["result"].get("value")
+                    else:
+                        valid_indicators += 1
+                        result[indicator_data["indicator"]] = indicator_data["result"]
         
         # Process third batch
         print("\nProcessing third batch of indicators...")
         batch3_data = process_batch(batch3)
-        if not batch3_data:
+        if batch3_data:
+            for indicator_data in batch3_data:
+                if indicator_data.get("result") and not indicator_data.get("result").get("error"):
+                    # Special handling for EMA with different periods
+                    if indicator_data["indicator"] == "ema":
+                        if "ema" not in result:
+                            result["ema"] = {}
+                        # Extract period from the ID
+                        period = indicator_data["id"].split("_")[-2]
+                        result["ema"][f"period_{period}"] = indicator_data["result"].get("value")
+                    else:
+                        valid_indicators += 1
+                        result[indicator_data["indicator"]] = indicator_data["result"]
+        
+        print(f"\nFound {valid_indicators} valid indicators")
+        
+        # Count EMAs as valid indicators if we have any
+        if "ema" in result and any(result["ema"].values()):
+            valid_indicators += 1
+        
+        # Return None only if we have fewer than 5 valid indicators
+        if valid_indicators < 5:
+            print(f"Insufficient valid indicators ({valid_indicators} < 5)")
             return None
-        
-        # Combine results from all batches
-        all_data = batch1_data + batch2_data + batch3_data
-        
-        # Map the responses to our TechnicalIndicators structure
-        for indicator_data in all_data:
-            indicator_id = indicator_data["id"]
-            indicator_result = indicator_data["result"]
             
-            # Extract indicator name from the ID
-            # Format: exchange_symbol_interval_indicator_params
-            id_parts = indicator_id.split("_")
-            indicator_name = id_parts[3]
-            
-            if "ema" in indicator_id:
-                period = id_parts[4]
-                if "ema" not in result:
-                    result["ema"] = {}
-                result["ema"][f"period_{period}"] = indicator_result["value"]
-            else:
-                result[indicator_name] = indicator_result
-        
         return result
         
     except Exception as e:
@@ -425,7 +450,121 @@ def generate_analysis(indicators: TechnicalIndicators, symbol: str, interval: st
     
     time_horizon = interval_horizons.get(interval, "medium-term")
     
-    # Format the context for GPT-4
+    # Build indicator sections based on available data
+    indicator_sections = []
+    
+    # Trend Indicators
+    trend_indicators = []
+    if 'ema' in indicators:
+        ema_values = []
+        for period in ['20', '50', '200']:
+            if f'period_{period}' in indicators['ema']:
+                ema_values.append(f"{period} [{indicators['ema'][f'period_{period}']:.2f}]")
+        if ema_values:
+            trend_indicators.append(f"• EMAs: {', '.join(ema_values)}")
+    
+    if 'supertrend' in indicators and 'value' in indicators['supertrend']:
+        trend_indicators.append(f"• Supertrend: {indicators['supertrend']['value']:.2f} (Signal: {indicators['supertrend'].get('valueAdvice', 'N/A')})")
+    
+    if 'adx' in indicators and 'value' in indicators['adx']:
+        trend_indicators.append(f"• ADX: {indicators['adx']['value']:.2f}")
+    
+    if 'dmi' in indicators and all(k in indicators['dmi'] for k in ['pdi', 'mdi']):
+        trend_indicators.append(f"• DMI: +DI {indicators['dmi']['pdi']:.2f}, -DI {indicators['dmi']['mdi']:.2f}")
+    
+    if 'psar' in indicators and 'value' in indicators['psar']:
+        trend_indicators.append(f"• PSAR: {indicators['psar']['value']:.2f}")
+    
+    if trend_indicators:
+        indicator_sections.append("Trend Indicators:\n" + "\n".join(trend_indicators))
+    
+    # Momentum & Oscillators
+    momentum_indicators = []
+    if 'rsi' in indicators and 'value' in indicators['rsi']:
+        momentum_indicators.append(f"• RSI: {indicators['rsi']['value']:.2f}")
+    
+    if 'macd' in indicators and all(k in indicators['macd'] for k in ['valueMACD', 'valueMACDSignal', 'valueMACDHist']):
+        macd = indicators['macd']
+        if all(macd[k] is not None for k in ['valueMACD', 'valueMACDSignal', 'valueMACDHist']):
+            momentum_indicators.append(f"• MACD: Line [{macd['valueMACD']:.2f}], Signal [{macd['valueMACDSignal']:.2f}], Hist [{macd['valueMACDHist']:.2f}]")
+    
+    if 'stoch' in indicators and all(k in indicators['stoch'] for k in ['valueK', 'valueD']):
+        stoch = indicators['stoch']
+        if stoch['valueK'] is not None and stoch['valueD'] is not None:
+            momentum_indicators.append(f"• Stochastic: K[{stoch['valueK']:.2f}], D[{stoch['valueD']:.2f}]")
+    
+    if 'mfi' in indicators and 'value' in indicators['mfi']:
+        if indicators['mfi']['value'] is not None:
+            momentum_indicators.append(f"• MFI: {indicators['mfi']['value']:.2f}")
+    
+    if 'cci' in indicators and 'value' in indicators['cci']:
+        if indicators['cci']['value'] is not None:
+            momentum_indicators.append(f"• CCI: {indicators['cci']['value']:.2f}")
+    
+    if momentum_indicators:
+        indicator_sections.append("Momentum & Oscillators:\n" + "\n".join(momentum_indicators))
+    
+    # Pattern Signals
+    pattern_indicators = []
+    for pattern in ['doji', 'engulfing', 'hammer', 'shootingstar']:
+        if pattern in indicators and 'value' in indicators[pattern]:
+            if indicators[pattern]['value'] is not None:
+                pattern_indicators.append(f"• {pattern.title()}: {indicators[pattern]['value']}")
+    
+    if pattern_indicators:
+        indicator_sections.append("Pattern Signals:\n" + "\n".join(pattern_indicators))
+    
+    # Price Structure & Volume
+    price_indicators = []
+    if 'fibonacciretracement' in indicators:
+        fib = indicators['fibonacciretracement']
+        if all(k in fib for k in ['value', 'trend', 'startPrice', 'endPrice']):
+            if all(fib[k] is not None for k in ['value', 'trend', 'startPrice', 'endPrice']):
+                price_indicators.append(f"• Fibonacci: {fib['value']:.2f} ({fib['trend']})")
+                price_indicators.append(f"  Range: {fib['startPrice']} → {fib['endPrice']}")
+    
+    if 'bbands' in indicators and all(k in indicators['bbands'] for k in ['valueUpperBand', 'valueMiddleBand', 'valueLowerBand']):
+        bb = indicators['bbands']
+        if all(bb[k] is not None for k in ['valueUpperBand', 'valueMiddleBand', 'valueLowerBand']):
+            price_indicators.append(f"• Bollinger Bands: Upper[{bb['valueUpperBand']:.2f}], Mid[{bb['valueMiddleBand']:.2f}], Lower[{bb['valueLowerBand']:.2f}]")
+    
+    if 'atr' in indicators and 'value' in indicators['atr']:
+        if indicators['atr']['value'] is not None:
+            price_indicators.append(f"• ATR: {indicators['atr']['value']:.2f}")
+    
+    if price_indicators:
+        indicator_sections.append("Price Structure & Volume:\n" + "\n".join(price_indicators))
+    
+    # Volume Analysis
+    volume_indicators = []
+    if 'volume' in indicators and 'value' in indicators['volume']:
+        if indicators['volume']['value'] is not None:
+            volume_indicators.append(f"• Current Volume: {indicators['volume']['value']:.2f}")
+    
+    if 'vwap' in indicators and 'value' in indicators['vwap']:
+        if indicators['vwap']['value'] is not None:
+            volume_indicators.append(f"• VWAP: {indicators['vwap']['value']:.2f}")
+    
+    if 'cmf' in indicators and 'value' in indicators['cmf']:
+        if indicators['cmf']['value'] is not None:
+            volume_indicators.append(f"• Chaikin Money Flow: {indicators['cmf']['value']:.2f}")
+    
+    if 'ad' in indicators and 'value' in indicators['ad']:
+        if indicators['ad']['value'] is not None:
+            volume_indicators.append(f"• A/D Line: {indicators['ad']['value']:.2f}")
+    
+    if 'adosc' in indicators and 'value' in indicators['adosc']:
+        if indicators['adosc']['value'] is not None:
+            volume_indicators.append(f"• A/D Oscillator: {indicators['adosc']['value']:.2f}")
+    
+    if 'obv' in indicators and 'value' in indicators['obv']:
+        if indicators['obv']['value'] is not None:
+            volume_indicators.append(f"• On Balance Volume: {indicators['obv']['value']:.2f}")
+    
+    if volume_indicators:
+        indicator_sections.append("Volume Analysis:\n" + "\n".join(volume_indicators))
+    
+    # Build the context for GPT-4
     context = f"""You are an experienced crypto technical analyst known for providing clear, opinionated market analysis.
 Given the following technical indicators for {symbol} on the {interval} timeframe, provide your expert interpretation.
 
@@ -433,47 +572,13 @@ ANALYSIS PARAMETERS:
 • Timeframe: {interval} candles
 • Trading Horizon: {time_horizon}
 • Analysis Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC
+• Data Quality: {'Partial (Limited Historical Data)' if len(indicators) < 20 else 'Full'}
 
 CURRENT MARKET DATA:
 
-Trend Indicators:
-• EMAs: 20 [{indicators['ema']['period_20']:.2f}], 50 [{indicators['ema']['period_50']:.2f}], 200 [{indicators['ema']['period_200']:.2f}]
-• Supertrend: {indicators['supertrend']['value']:.2f} (Signal: {indicators['supertrend']['valueAdvice']})
-• ADX: {indicators['adx']['value']:.2f} | DMI: +DI {indicators['dmi']['pdi']:.2f}, -DI {indicators['dmi']['mdi']:.2f}
-• PSAR: {indicators['psar']['value']:.2f}
+{chr(10).join(indicator_sections)}
 
-Momentum & Oscillators:
-• RSI: {indicators['rsi']['value']:.2f}
-• MACD: Line [{indicators['macd']['valueMACD']:.2f}], Signal [{indicators['macd']['valueMACDSignal']:.2f}], Hist [{indicators['macd']['valueMACDHist']:.2f}]
-• Stochastic: K[{indicators['stoch']['valueK']:.2f}], D[{indicators['stoch']['valueD']:.2f}]
-• MFI: {indicators['mfi']['value']:.2f}
-• CCI: {indicators['cci']['value']:.2f}
-
-Pattern Signals:
-• Doji: {indicators['doji']['value']} | Engulfing: {indicators['engulfing']['value']}
-• Hammer: {indicators['hammer']['value']} | Shooting Star: {indicators['shootingstar']['value']}
-
-Price Structure & Volume:
-• Fibonacci: {indicators['fibonacciretracement']['value']:.2f} ({indicators['fibonacciretracement']['trend']})
-  Range: {indicators['fibonacciretracement']['startPrice']} → {indicators['fibonacciretracement']['endPrice']}
-• Bollinger Bands: Upper[{indicators['bbands']['valueUpperBand']:.2f}], Mid[{indicators['bbands']['valueMiddleBand']:.2f}], Lower[{indicators['bbands']['valueLowerBand']:.2f}]
-• ATR: {indicators['atr']['value']:.2f}
-
-Volume Analysis:
-• Current Volume: {indicators['volume']['value']:.2f}
-• Chaikin Money Flow: {indicators['cmf']['value']:.2f}
-• A/D Line: {indicators['ad']['value']:.2f}
-• A/D Oscillator: {indicators['adosc']['value']:.2f}
-• On Balance Volume: {indicators['obv']['value']:.2f}
-• Volume Oscillator: {indicators['vosc']['value']:.2f}
-• VWAP: {indicators['vwap']['value']:.2f}
-
-Volume Interpretation:
-• Money Flow: {'Positive' if indicators['cmf']['value'] > 0 else 'Negative'} (CMF)
-• Volume Trend: {'Increasing' if indicators['vosc']['value'] > 0 else 'Decreasing'} (VOSC)
-• Price/Volume Alignment: {'Confirming' if (indicators['obv']['value'] > 0) == (indicators['adosc']['value'] > 0) else 'Diverging'}
-
-Based on these indicators, provide a concise but thorough analysis for the {time_horizon} horizon that:
+Based on these available indicators, provide a concise but thorough analysis for the {time_horizon} horizon that:
 1. States your CLEAR DIRECTIONAL BIAS (bullish/bearish/neutral) with confidence level
 2. Identifies the MOST SIGNIFICANT signals that form your bias
 3. Points out any CONFLICTING signals that need attention
@@ -490,7 +595,8 @@ Remember:
 - Be opinionated and clear in your analysis
 - Point out risks to your thesis
 - All price targets and analysis should align with the {time_horizon} trading horizon
-- Specify whether setups are for swing trading or position trading given the timeframe"""
+- Specify whether setups are for swing trading or position trading given the timeframe
+- Acknowledge the data quality and adjust confidence levels accordingly"""
 
     try:
         client = openai.OpenAI()
@@ -515,7 +621,7 @@ def run_analysis(prompt: str) -> str:
     """Run technical analysis and return JSON output."""
     available_symbols = get_available_symbols()
     if not available_symbols:
-        return run_default_analysis()
+        return json.dumps({"error": "Could not fetch available trading pairs. Please try again later."})
     
     try:
         token, interval = parse_prompt_with_llm(prompt)
@@ -527,16 +633,22 @@ def run_analysis(prompt: str) -> str:
         token, interval = parse_analysis_request(prompt)
     
     if not token:
-        return run_default_analysis()
+        return json.dumps({"error": "Could not determine which token to analyze. Please specify a token."})
     
     pair = find_best_pair(token, available_symbols)
     
     if not pair:
-        return run_default_analysis(requested_token=token)
+        return json.dumps({
+            "error": f"No trading pair found for {token}. Please verify the token symbol and try again.",
+            "available_pairs": available_symbols[:10]  # Show first 10 available pairs as reference
+        })
     
     indicators = fetch_indicators(pair, interval=interval)
     if not indicators:
-        return run_default_analysis(requested_token=token)
+        return json.dumps({
+            "error": f"Insufficient data for {pair} on {interval} timeframe. This may be a new token with limited historical data.",
+            "suggestion": "Try a shorter timeframe or a more established token."
+        })
     
     analysis = generate_analysis(indicators, pair, interval)
     
@@ -547,6 +659,7 @@ def run_analysis(prompt: str) -> str:
             "pair": pair,
             "interval": interval,
             "timestamp": datetime.now().isoformat(),
+            "data_quality": "partial" if len(indicators) < 20 else "full"
         },
         "technical_indicators": format_indicators_json(indicators),
         "ai_analysis": analysis
