@@ -194,9 +194,6 @@ def fetch_indicators(clients: APIClients, symbol: str, exchange: str = "gateio",
                 }
             }
             
-            print("\nSending request with payload:")
-            print(json.dumps(payload, indent=2))
-            
             response = requests.post(url, json=payload, headers={"Content-Type": "application/json"})
             
             if not response.ok:
@@ -208,8 +205,6 @@ def fetch_indicators(clients: APIClients, symbol: str, exchange: str = "gateio",
                 return None
             
             response_data = response.json()
-            print("\nReceived Response:")
-            print(json.dumps(response_data, indent=2))
             
             return response_data.get("data", [])
         
@@ -705,21 +700,19 @@ def run(
         # Generate analysis and store the prompt
         analysis, analysis_prompt = generate_analysis(clients, indicators, pair, interval)
         
-        # Create the final response
-        output = {
-            "metadata": {
-                "token": token,
-                "pair": pair,
-                "interval": interval,
-                "timestamp": datetime.now().isoformat(),
-                "data_quality": "partial" if len(indicators) < 20 else "full"
-            },
-            "technical_indicators": format_indicators_json(indicators),
-            "ai_analysis": analysis
+        # Store all context in metadata
+        metadata_dict = {
+            "analysis_prompt": analysis_prompt,
+            "token": token,
+            "pair": pair,
+            "interval": interval,
+            "timestamp": datetime.now().isoformat(),
+            "data_quality": "partial" if len(indicators) < 20 else "full",
+            "technical_indicators": format_indicators_json(indicators)
         }
         
-        response = json.dumps(output, indent=2)
-        metadata_dict = {"analysis_prompt": analysis_prompt}  # Store the analysis prompt in metadata
+        # Return just the analysis text as the response
+        response = analysis
 
     except Exception as e:
         print(f"An error occurred: {e}")
