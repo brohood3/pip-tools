@@ -1,6 +1,9 @@
+import functools
+
+import openai
 import requests
 import os
-from typing import List, Dict, Optional, TypedDict
+from typing import List, Dict, Optional, TypedDict, Tuple, Any, Callable
 from openai import OpenAI
 
 # Type Definitions
@@ -18,10 +21,10 @@ class TokenDetails(TypedDict):
     links: Dict[str, List[str]]
 
 class APIClients:
-    def __init__(self):
-        self.coingecko_api_key = os.getenv('COINGECKO_API_KEY')
-        self.openai_api_key = os.getenv('OPENAI_API_KEY')
-        self.perplexity_api_key = os.getenv('PERPLEXITY_API_KEY')
+    def __init__(self, api_keys: Any):
+        self.coingecko_api_key = api_keys["coingecko"]
+        self.openai_api_key = api_keys["openai"]
+        self.perplexity_api_key = api_keys["perplexity"]
         
         if not all([self.coingecko_api_key, self.openai_api_key, self.perplexity_api_key]):
             raise ValueError("Missing required API keys in environment variables")
@@ -445,20 +448,52 @@ Focus on providing actionable insights for sophisticated investors who understan
         print(f"Error generating general market analysis: {e}")
         return None
 
-def main():
+MechResponse = Tuple[str, Optional[str], Optional[Dict[str, Any]], Any, Any]
+
+def with_key_rotation(func: Callable):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs) -> MechResponse:
+        # this is expected to be a KeyChain object,
+        # although it is not explicitly typed as such
+        api_keys = kwargs["api_keys"]
+        retries_left: Dict[str, int] = api_keys.max_retries()
+
+        def execute() -> MechResponse:
+            """Retry the function with a new key."""
+            try:
+                result = func(*args, **kwargs)
+                return result + (api_keys,)
+            except openai.RateLimitError as e:
+                # try with a new key again
+                if retries_left["openai"] <= 0 and retries_left["openrouter"] <= 0:
+                    raise e
+                retries_left["openai"] -= 1
+                retries_left["openrouter"] -= 1
+                api_keys.rotate("openai")
+                api_keys.rotate("openrouter")
+                return execute()
+            except Exception as e:
+                return str(e), "", None, None, api_keys
+
+        mech_response = execute()
+        return mech_response
+
+    return wrapper
+
+
+@with_key_rotation
+def run(
+    prompt: str,
+    api_keys: Any,
+    **kwargs: Any,
+) -> Tuple[str, Optional[str], Optional[Dict[str, Any]], Any]:
+    # default response
+    response = "Invalid response"
+
     try:
-        # Initialize API clients
-        clients = APIClients()
-        
-        # Get analysis prompt from command line argument or input
-        import sys
-        if len(sys.argv) > 1:
-            prompt = ' '.join(sys.argv[1:])
-        else:
-            prompt = input("Enter your cryptocurrency analysis question (e.g., 'what is the outlook for solana in the coming year'): ").strip()
-            
+        clients = APIClients(api_keys)
+
         print(f"\nAnalyzing prompt: {prompt}")
-        
         # Get CoinGecko ID from the prompt
         coin_id = get_coingecko_id_from_prompt(clients, prompt)
         if not coin_id:
@@ -518,35 +553,39 @@ def main():
         # Display description
         print("\nDescription:")
         print(details['description'][:500] + "..." if len(details['description']) > 500 else details['description'])
-        
+
         # Generate analyses
         print("\nGenerating Tokenomics & Market Analysis...")
         tokenomics_analysis = get_investment_analysis(clients, details)
         if tokenomics_analysis:
             print("\nTokenomics & Market Analysis:")
-            print(tokenomics_analysis)
+            response = tokenomics_analysis
         
         print("\nResearching Project Details...")
         project_research = get_project_research(clients, details)
         if project_research:
             print("\nProject Research:")
-            print(project_research)
+            response = project_research
             
         print("\nAnalyzing Market Context & Competition...")
         market_context = get_market_context_analysis(clients, details)
         if market_context:
             print("\nMarket Context Analysis:")
-            print(market_context)
+            response = market_context
             
         if all([tokenomics_analysis, project_research, market_context]):
             print("\nGenerating Investment Report...")
             report = generate_investment_report(clients, details, tokenomics_analysis, project_research, market_context)
             if report:
                 print("\n=== INVESTMENT REPORT ===")
-                print(report)
-                
+                response = report
+
     except Exception as e:
         print(f"An error occurred: {e}")
 
-if __name__ == "__main__":
-    main()
+    return (
+        response,
+        "",
+        None,
+        None,
+    )
