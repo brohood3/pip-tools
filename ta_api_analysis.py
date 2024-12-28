@@ -7,12 +7,14 @@ import os
 import requests
 import pandas as pd
 import numpy as np
-from typing import Dict, Optional, List, TypedDict, Union
+from typing import Dict, Optional, List, TypedDict, Union, Any, Callable, Tuple
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import json
 import time
 import openai
+from openai import OpenAI
+import functools
 
 # --- Environment Setup ---
 load_dotenv()
@@ -65,6 +67,16 @@ class TechnicalIndicators(TypedDict):
     obv: Dict[str, float]  # On Balance Volume
     vosc: Dict[str, float]  # Volume Oscillator
 
+class APIClients:
+    def __init__(self, api_keys: Any):
+        self.taapi_key = api_keys["taapi"]
+        self.openai_api_key = api_keys["openai"]
+        
+        if not all([self.taapi_key, self.openai_api_key]):
+            raise ValueError("Missing required API keys")
+            
+        self.openai_client = OpenAI()
+
 # --- API Interaction Functions ---
 def get_available_symbols() -> List[str]:
     """Fetch available trading pairs from TAapi for Gate.io."""
@@ -91,7 +103,7 @@ def get_available_symbols() -> List[str]:
         print(f"Warning: Could not fetch Gate.io symbols ({str(e)}). Using BTC analysis.")
         return []
 
-def fetch_indicators(symbol: str, exchange: str = "gateio", interval: str = "1d") -> Optional[TechnicalIndicators]:
+def fetch_indicators(clients: APIClients, symbol: str, exchange: str = "gateio", interval: str = "1d") -> Optional[TechnicalIndicators]:
     """
     Fetch technical indicators using TAapi's bulk endpoint.
     Indicators are split into batches to comply with API limits.
@@ -173,7 +185,7 @@ def fetch_indicators(symbol: str, exchange: str = "gateio", interval: str = "1d"
         # Function to process a batch and count valid indicators
         def process_batch(indicators):
             payload = {
-                "secret": TAAPI_KEY,
+                "secret": clients.taapi_key,
                 "construct": {
                     "exchange": exchange,
                     "symbol": symbol,
@@ -372,7 +384,7 @@ def parse_analysis_request(prompt: str) -> tuple[str, str]:
     
     return token, interval
 
-def parse_prompt_with_llm(prompt: str) -> tuple[str, str]:
+def parse_prompt_with_llm(clients: APIClients, prompt: str) -> tuple[str, str]:
     """Use GPT-4o-mini to extract token and timeframe from natural language prompt."""
     context = f"""Extract the cryptocurrency token name and timeframe from the following analysis request.
 Valid timeframes are: 1m, 5m, 15m, 30m, 1h, 2h, 4h, 12h, 1d, 1w
@@ -395,8 +407,7 @@ Now extract from this request: "{prompt}"
 IMPORTANT: Respond with ONLY the raw JSON object. Do not include markdown formatting, code blocks, or any other text. The response should start with {{ and end with }}."""
 
     try:
-        client = openai.OpenAI()
-        response = client.chat.completions.create(
+        response = clients.openai_client.chat.completions.create(
             model="gpt-4o-mini",  # Using the new mini model
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that extracts cryptocurrency analysis parameters from natural language requests. You respond with raw JSON only."},
@@ -432,7 +443,7 @@ IMPORTANT: Respond with ONLY the raw JSON object. Do not include markdown format
         return parse_analysis_request(prompt)
 
 # --- Analysis Generation Functions ---
-def generate_analysis(indicators: TechnicalIndicators, symbol: str, interval: str) -> str:
+def generate_analysis(clients: APIClients, indicators: TechnicalIndicators, symbol: str, interval: str) -> tuple[str, str]:
     """Generate an opinionated technical analysis report using GPT-4."""
     # Map intervals to human-readable time horizons
     interval_horizons = {
@@ -599,8 +610,7 @@ Remember:
 - Acknowledge the data quality and adjust confidence levels accordingly"""
 
     try:
-        client = openai.OpenAI()
-        response = client.chat.completions.create(
+        response = clients.openai_client.chat.completions.create(
             model="gpt-4o",
             messages=[
                 {"role": "system", "content": f"You are a seasoned technical analyst specializing in {time_horizon} {symbol} analysis. You focus on meaningful interpretation of indicators rather than just describing them."},
@@ -610,98 +620,114 @@ Remember:
             max_tokens=1500
         )
         
-        return response.choices[0].message.content
+        return response.choices[0].message.content, context
         
     except Exception as e:
         print(f"Error generating analysis: {str(e)}")
-        return "Error generating analysis. Please try again."
+        return "Error generating analysis. Please try again.", ""
 
-# --- Main Execution Functions ---
-def run_analysis(prompt: str) -> str:
-    """Run technical analysis and return JSON output."""
-    available_symbols = get_available_symbols()
-    if not available_symbols:
-        return json.dumps({"error": "Could not fetch available trading pairs. Please try again later."})
-    
+def with_key_rotation(func: Callable):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs) -> MechResponse:
+        # this is expected to be a KeyChain object,
+        # although it is not explicitly typed as such
+        api_keys = kwargs["api_keys"]
+        retries_left: Dict[str, int] = api_keys.max_retries()
+
+        def execute() -> MechResponse:
+            """Retry the function with a new key."""
+            try:
+                result = func(*args, **kwargs)
+                return result + (api_keys,)
+            except openai.RateLimitError as e:
+                # try with a new key again
+                if retries_left["openai"] <= 0 and retries_left["openrouter"] <= 0:
+                    raise e
+                retries_left["openai"] -= 1
+                retries_left["openrouter"] -= 1
+                api_keys.rotate("openai")
+                api_keys.rotate("openrouter")
+                return execute()
+            except Exception as e:
+                return str(e), "", None, None, api_keys
+
+        mech_response = execute()
+        return mech_response
+
+    return wrapper
+
+MechResponse = Tuple[str, Optional[str], Optional[Dict[str, Any]], Any, Any]
+
+@with_key_rotation
+def run(
+    prompt: str,
+    api_keys: Any,
+    **kwargs: Any,
+) -> Tuple[str, Optional[str], Optional[Dict[str, Any]], Any]:
+    """Run technical analysis and return structured response."""
+    # default response
+    response = "Invalid response"
+    metadata_dict = None
+    analysis_prompt = None  # Store the analysis prompt
+
     try:
-        token, interval = parse_prompt_with_llm(prompt)
-        print(f"\nExtracted Parameters:")
-        print(f"Token: {token}")
-        print(f"Timeframe: {interval}")
+        clients = APIClients(api_keys)
+        
+        print(f"\nAnalyzing prompt: {prompt}")
+        
+        # Extract token and interval from prompt
+        try:
+            token, interval = parse_prompt_with_llm(clients, prompt)
+            print(f"\nExtracted Parameters:")
+            print(f"Token: {token}")
+            print(f"Timeframe: {interval}")
+        except Exception as e:
+            print(f"\nFalling back to basic prompt parsing due to error: {str(e)}")
+            token, interval = parse_analysis_request(prompt)
+        
+        if not token:
+            return "Could not determine which token to analyze. Please specify a token.", "", None, None
+        
+        # Get available symbols and find best pair
+        available_symbols = get_available_symbols()
+        if not available_symbols:
+            return "Could not fetch available trading pairs. Please try again later.", "", None, None
+        
+        pair = find_best_pair(token, available_symbols)
+        if not pair:
+            return f"No trading pair found for {token}. Please verify the token symbol and try again.", "", None, None
+        
+        # Fetch indicators
+        indicators = fetch_indicators(clients, pair, interval=interval)
+        if not indicators:
+            return f"Insufficient data for {pair} on {interval} timeframe.", "", None, None
+        
+        # Generate analysis and store the prompt
+        analysis, analysis_prompt = generate_analysis(clients, indicators, pair, interval)
+        
+        # Create the final response
+        output = {
+            "metadata": {
+                "token": token,
+                "pair": pair,
+                "interval": interval,
+                "timestamp": datetime.now().isoformat(),
+                "data_quality": "partial" if len(indicators) < 20 else "full"
+            },
+            "technical_indicators": format_indicators_json(indicators),
+            "ai_analysis": analysis
+        }
+        
+        response = json.dumps(output, indent=2)
+        metadata_dict = {"analysis_prompt": analysis_prompt}  # Store the analysis prompt in metadata
+
     except Exception as e:
-        print(f"\nFalling back to basic prompt parsing due to error: {str(e)}")
-        token, interval = parse_analysis_request(prompt)
-    
-    if not token:
-        return json.dumps({"error": "Could not determine which token to analyze. Please specify a token."})
-    
-    pair = find_best_pair(token, available_symbols)
-    
-    if not pair:
-        return json.dumps({
-            "error": f"No trading pair found for {token}. Please verify the token symbol and try again.",
-            "available_pairs": available_symbols[:10]  # Show first 10 available pairs as reference
-        })
-    
-    indicators = fetch_indicators(pair, interval=interval)
-    if not indicators:
-        return json.dumps({
-            "error": f"Insufficient data for {pair} on {interval} timeframe. This may be a new token with limited historical data.",
-            "suggestion": "Try a shorter timeframe or a more established token."
-        })
-    
-    analysis = generate_analysis(indicators, pair, interval)
-    
-    # Create the final JSON output
-    output = {
-        "metadata": {
-            "token": token,
-            "pair": pair,
-            "interval": interval,
-            "timestamp": datetime.now().isoformat(),
-            "data_quality": "partial" if len(indicators) < 20 else "full"
-        },
-        "technical_indicators": format_indicators_json(indicators),
-        "ai_analysis": analysis
-    }
-    
-    return json.dumps(output, indent=2)
+        print(f"An error occurred: {e}")
+        return str(e), "", None, None
 
-def run_default_analysis(requested_token: str = None) -> str:
-    """Run default analysis using BTC/USDT and return JSON output."""
-    indicators = fetch_indicators("BTC/USDT", interval="1d")
-    if not indicators:
-        return json.dumps({"error": "Could not fetch market data. Please try again later."})
-    
-    analysis = generate_analysis(indicators, "BTC/USDT", "1d")
-    
-    output = {
-        "metadata": {
-            "note": f"No trading pair found for {requested_token}. Using BTC as market proxy." if requested_token else "Using default BTC analysis",
-            "token": "BTC",
-            "pair": "BTC/USDT",
-            "interval": "1d",
-            "timestamp": datetime.now().isoformat(),
-        },
-        "technical_indicators": format_indicators_json(indicators),
-        "ai_analysis": analysis
-    }
-    
-    return json.dumps(output, indent=2)
-
-# --- Main Entry Point ---
-if __name__ == "__main__":
-    import sys
-    
-    if len(sys.argv) > 1:
-        prompt = " ".join(sys.argv[1:])
-    else:
-        prompt = input("Enter your analysis request (e.g., 'ta analysis for NEAR'): ")
-    
-    print(f"\n{'='*50}")
-    print("Technical Analysis Request")
-    print(f"Prompt: {prompt}")
-    print(f"{'='*50}")
-    
-    analysis_json = run_analysis(prompt)
-    print(analysis_json)
+    return (
+        response,
+        "",
+        metadata_dict,
+        None,
+    )

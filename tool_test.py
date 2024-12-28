@@ -1,6 +1,6 @@
 import os
 
-from fundamental_analysis import run
+from ta_api_analysis import run
 from typing import Dict, List
 
 # the following is copied over from the mech to simulate the API key retrieval
@@ -136,11 +136,12 @@ class TokenCounterCallback:
 
 
 keys = KeyChain({
-    "coingecko": [os.getenv('COINGECKO_API_KEY')],
+    "taapi": [os.getenv('TAAPI_KEY')],
     "openai": [os.getenv('OPENAI_API_KEY')],
-    "perplexity": [os.getenv('PERPLEXITY_API_KEY')],
 })
-prompt = "Analyze OLAS price and predict future price."
+
+# Test prompt for technical analysis
+prompt = "Analyze BTC/USDT on 1h timeframe"
 
 print(run(
     prompt=prompt,
