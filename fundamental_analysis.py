@@ -93,7 +93,7 @@ Key Metrics:
 - Market Cap/FDV Ratio: {token_details['market_cap_fdv_ratio']:.2f}
 - 24h Price Change: {token_details['price_change_24h']:.2f}%
 - 14d Price Change: {token_details['price_change_14d']:.2f}%
-- Social Following: {token_details['twitter_followers']:,} Twitter followers
+- Social Following: {token_details['twitter_followers']:,}) Twitter followers
 
 Your analysis should be suitable for sophisticated investors who:
 - Understand DeFi fundamentals
@@ -326,8 +326,7 @@ Based on our team's comprehensive analyses:
             }],
             temperature=0.7
         )
-        
-        return completion.choices[0].message.content
+        return completion.choices[0].message.content, prompt
         
     except Exception as e:
         print(f"Error generating investment report: {e}")
@@ -489,37 +488,24 @@ def run(
 ) -> Tuple[str, Optional[str], Optional[Dict[str, Any]], Any]:
     # default response
     response = "Invalid response"
+    metadata_dict = None
 
     try:
         clients = APIClients(api_keys)
-
+        
         print(f"\nAnalyzing prompt: {prompt}")
+        
         # Get CoinGecko ID from the prompt
         coin_id = get_coingecko_id_from_prompt(clients, prompt)
         if not coin_id:
-            print("\nCould not identify a specific cryptocurrency from your prompt.")
-            print("Generating general cryptocurrency market analysis instead...")
+            return "Could not identify cryptocurrency from prompt.", "", None, None
             
-            analysis = get_general_market_analysis(clients)
-            if analysis:
-                print("\n=== CRYPTOCURRENCY MARKET ANALYSIS ===")
-                print(analysis)
-            return
-            
-        print(f"\nIdentified cryptocurrency with CoinGecko ID: {coin_id}")
+        # Get token details
         print("Fetching details...")
-        
         details = get_token_details(coin_id)
         if not details:
-            print("\nCould not fetch token details.")
-            print("Generating general cryptocurrency market analysis instead...")
-            
-            analysis = get_general_market_analysis(clients)
-            if analysis:
-                print("\n=== CRYPTOCURRENCY MARKET ANALYSIS ===")
-                print(analysis)
-            return
-            
+            return "Could not fetch token details.", "", None, None
+
         # Display basic token information
         print(f"\n{details['name']} ({details['symbol']})")
         print(f"Chain: {details['chain']}")
@@ -549,36 +535,33 @@ def run(
                         for url in sub_urls:
                             if url:
                                 print(f"  - {url}")
-        
+
         # Display description
         print("\nDescription:")
         print(details['description'][:500] + "..." if len(details['description']) > 500 else details['description'])
-
+        
         # Generate analyses
         print("\nGenerating Tokenomics & Market Analysis...")
         tokenomics_analysis = get_investment_analysis(clients, details)
         if tokenomics_analysis:
-            print("\nTokenomics & Market Analysis:")
             response = tokenomics_analysis
         
         print("\nResearching Project Details...")
         project_research = get_project_research(clients, details)
         if project_research:
-            print("\nProject Research:")
             response = project_research
             
         print("\nAnalyzing Market Context & Competition...")
         market_context = get_market_context_analysis(clients, details)
         if market_context:
-            print("\nMarket Context Analysis:")
             response = market_context
             
         if all([tokenomics_analysis, project_research, market_context]):
             print("\nGenerating Investment Report...")
-            report = generate_investment_report(clients, details, tokenomics_analysis, project_research, market_context)
+            report, report_prompt = generate_investment_report(clients, details, tokenomics_analysis, project_research, market_context)
             if report:
-                print("\n=== INVESTMENT REPORT ===")
                 response = report
+                metadata_dict = {"report_prompt": report_prompt}
 
     except Exception as e:
         print(f"An error occurred: {e}")
@@ -586,6 +569,6 @@ def run(
     return (
         response,
         "",
-        None,
+        metadata_dict,
         None,
     )
