@@ -1,6 +1,6 @@
 import os
 
-from fundamental_analysis import run
+from query_extract import run
 from typing import Dict, List
 
 # the following is copied over from the mech to simulate the API key retrieval
@@ -136,13 +136,12 @@ class TokenCounterCallback:
 
 
 keys = KeyChain({
-    "perplexity": [os.getenv('PERPLEXITY_API_KEY')],
-    "coingecko": [os.getenv('COINGECKO_API_KEY')],
+    "dune": [os.getenv('DUNE_API_KEY')],
     "openai": [os.getenv('OPENAI_API_KEY')],
 })
 
 # Test prompt for technical analysis
-prompt = "Give us a price prediction for OLAS"
+prompt = "query 4508132 displays KLIMA pools on Base. What are the top 3 pools by apr and their aprs multiplied by 100?"
 
 print(run(
     prompt=prompt,

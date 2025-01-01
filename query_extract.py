@@ -11,8 +11,9 @@ import json
 # Type Definitions
 class QueryDetails(TypedDict):
     query_id: int
-    description: str
-    row_count: int
+    question: str
+    total_row_count: int
+    returned_row_count: int
     column_names: List[str]
     execution_time: str
     last_refresh_time: str
@@ -35,13 +36,21 @@ def get_dune_results(clients: APIClients, query_id: int) -> Optional[Dict[Any, A
         
         # Convert ResultsResponse to dictionary
         if hasattr(result, 'result'):
-            # Limit to 100 rows and convert to dictionary
-            rows = result.result.rows[:100] if len(result.result.rows) > 100 else result.result.rows
+            # Store total row count before limiting
+            total_rows = len(result.result.rows)
+            
+            # Get column names if available
+            column_names = list(result.result.rows[0].keys()) if result.result.rows else []
+            
+            # Limit to 100 rows by default
+            rows = result.result.rows[:100]
+            
             return {
                 'result': rows,
                 'metadata': {
-                    'row_count': len(rows),
-                    'column_names': list(rows[0].keys()) if rows else [],
+                    'total_row_count': total_rows,
+                    'returned_row_count': len(rows),
+                    'column_names': column_names,
                     'execution_time': result.execution_time if hasattr(result, 'execution_time') else None,
                     'last_refresh_time': result.last_refresh_time if hasattr(result, 'last_refresh_time') else None
                 }
@@ -54,59 +63,69 @@ def get_dune_results(clients: APIClients, query_id: int) -> Optional[Dict[Any, A
         print(f"Error fetching Dune results: {e}")
         return None
 
-def generate_analysis(clients: APIClients, data: Dict[Any, Any], query_description: str) -> str:
-    """Generate an opinionated analysis of the Dune query results using GPT"""
+def extract_specific_info(clients: APIClients, data: Dict[Any, Any], question: str) -> str:
+    """Extract specific information from query results based on the question"""
     try:
         result_data = data.get('result', [])
         metadata = data.get('metadata', {})
         
-        prompt = f"""As a senior blockchain data analyst, analyze these on-chain metrics and provide actionable insights:
+        # Add warning about data limitation if necessary
+        data_limitation_note = ""
+        if metadata.get('total_row_count', 0) > metadata.get('returned_row_count', 0):
+            data_limitation_note = f"""Note: This query contains {metadata.get('total_row_count')} rows in total, 
+but only the first {metadata.get('returned_row_count')} rows are shown for analysis. 
+If you need specific information that might be in the remaining rows, please refine your question."""
+        
+        prompt = f"""As a data analyst, extract specific information from this query result to answer the following question:
 
-QUERY CONTEXT:
-This query {query_description}
+QUESTION:
+{question}
 
-DATA SUMMARY:
-- Rows Analyzed: {metadata.get('row_count', 0)}
-- Metrics Available: {', '.join(metadata.get('column_names', []))}
-- Last Updated: {metadata.get('last_refresh_time', 'Unknown')}
+DATA STRUCTURE:
+Available columns: {', '.join(metadata.get('column_names', []))}
+Total rows in query: {metadata.get('total_row_count', 0)}
+Rows available for analysis: {metadata.get('returned_row_count', 0)}
+Last updated: {metadata.get('last_refresh_time', 'Unknown')}
 
-RAW DATA (Limited to 100 rows):
+{data_limitation_note}
+
+RAW DATA (Limited to {metadata.get('returned_row_count')} rows):
 {json.dumps(result_data, indent=2)}
 
-Based on this data, provide:
-1. Key findings and their significance
-2. Notable trends or patterns
-3. Actionable insights or recommendations
-4. Potential risks or limitations in the data
+Please provide:
+1. A direct answer to the question using specific numbers/values from the data
+2. Only include relevant information that was asked for
+3. Format numbers clearly (e.g., percentages, dollar amounts)
+4. If the exact information isn't available or might be in the hidden rows, clearly state this limitation
 
-Focus on insights that would be valuable for investment or strategic decisions. Support your analysis with specific numbers from the data."""
+Keep the response focused and concise. Only answer what was asked."""
 
         response = clients.openai_client.chat.completions.create(
             model="gpt-4o",
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a senior blockchain data analyst known for extracting actionable insights from on-chain data. Focus on patterns and implications that matter for decision-making. Be specific and cite numbers from the data."
+                    "content": "You are a precise data analyst who extracts specific information from query results. Provide direct, focused answers using only the data available. Format numbers clearly and consistently. If data is limited, acknowledge this limitation in your response."
                 },
                 {
                     "role": "user",
                     "content": prompt
                 }
             ],
-            temperature=0.7
+            temperature=0.3  # Lower temperature for more focused responses
         )
         
         return response.choices[0].message.content
         
     except Exception as e:
-        print(f"Error generating analysis: {e}")
+        print(f"Error extracting information: {e}")
         return None
 
-def extract_query_id(prompt: str) -> Optional[int]:
-    """Extract Dune query ID from the prompt"""
+def extract_query_details(prompt: str) -> Tuple[Optional[int], str]:
+    """Extract query ID and the specific question from the prompt"""
     try:
-        # Look for numbers after common patterns
-        patterns = [
+        # Extract query ID
+        id_patterns = [
             r"query (\d+)",
             r"query id (\d+)",
             r"dune (\d+)",
@@ -117,16 +136,28 @@ def extract_query_id(prompt: str) -> Optional[int]:
             r"(\d+)"  # fallback to any number
         ]
         
-        for pattern in patterns:
+        query_id = None
+        for pattern in id_patterns:
             match = re.search(pattern, prompt.lower())
             if match:
-                return int(match.group(1))
+                query_id = int(match.group(1))
+                break
         
-        return None
+        # Extract the question by removing the query ID part
+        question = prompt
+        if query_id:
+            for pattern in id_patterns:
+                question = re.sub(pattern, "", question, flags=re.IGNORECASE).strip()
+        
+        # Clean up the question
+        question = re.sub(r'\s+', ' ', question).strip()
+        question = question.strip('?. ')
+        
+        return query_id, question
         
     except Exception as e:
-        print(f"Error extracting query ID: {e}")
-        return None
+        print(f"Error extracting query details: {e}")
+        return None, ""
 
 MechResponse = Tuple[str, Optional[str], Optional[Dict[str, Any]], Any, Any]
 
@@ -161,7 +192,7 @@ def run(
     api_keys: Any,
     **kwargs: Any,
 ) -> Tuple[str, Optional[str], Optional[Dict[str, Any]], Any]:
-    """Run Dune query analysis and return structured response."""
+    """Extract specific information from a Dune query based on the question."""
     # default response
     response = "Invalid response"
     metadata_dict = None
@@ -169,10 +200,10 @@ def run(
     try:
         clients = APIClients(api_keys)
         
-        print(f"\nAnalyzing prompt: {prompt}")
+        print(f"\nProcessing question: {prompt}")
         
-        # Extract query ID from prompt
-        query_id = extract_query_id(prompt)
+        # Extract query ID and question
+        query_id, question = extract_query_details(prompt)
         if not query_id:
             return "Could not determine Dune query ID. Please provide a valid query ID.", "", None, None
         
@@ -181,17 +212,18 @@ def run(
         if not results:
             return f"Could not fetch results for query {query_id}. Please verify the query exists and has recent results.", "", None, None
         
-        # Generate analysis
-        analysis = generate_analysis(clients, results, prompt)
-        if not analysis:
-            return "Error generating analysis. Please try again.", "", None, None
+        # Extract specific information
+        answer = extract_specific_info(clients, results, question)
+        if not answer:
+            return "Error extracting information. Please try again.", "", None, None
         
         # Store all context in metadata
         metadata_dict = {
             "query_details": {
                 "query_id": query_id,
-                "description": prompt,
-                "row_count": results['metadata']['row_count'],
+                "question": question,
+                "total_row_count": results['metadata']['total_row_count'],
+                "returned_row_count": results['metadata']['returned_row_count'],
                 "column_names": results['metadata']['column_names'],
                 "execution_time": results['metadata']['execution_time'],
                 "last_refresh_time": results['metadata']['last_refresh_time']
@@ -202,8 +234,8 @@ def run(
             "timestamp": datetime.now().isoformat()
         }
         
-        # Return just the analysis text as the response
-        response = analysis
+        # Return just the specific answer as the response
+        response = answer
 
     except Exception as e:
         print(f"An error occurred: {e}")
@@ -214,4 +246,4 @@ def run(
         "",
         metadata_dict,
         None,
-    )
+    ) 
