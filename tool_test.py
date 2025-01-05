@@ -136,7 +136,7 @@ class TokenCounterCallback:
 
 
 keys = KeyChain({
-    "coingecko": [os.getenv('COINGECKO_API_KEY')],
+    "dune": [os.getenv('DUNE_API_KEY')],
     "openai": [os.getenv('OPENAI_API_KEY')],
     "perplexity": [os.getenv('PERPLEXITY_API_KEY')],
     "flipside": [os.getenv('FLIPSIDE_API_KEY')],

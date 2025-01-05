@@ -5,6 +5,7 @@ import requests
 import os
 from typing import List, Dict, Optional, TypedDict, Tuple, Any, Callable
 from openai import OpenAI
+from datetime import datetime
 
 # Type Definitions
 class TokenDetails(TypedDict):
@@ -93,7 +94,7 @@ Key Metrics:
 - Market Cap/FDV Ratio: {token_details['market_cap_fdv_ratio']:.2f}
 - 24h Price Change: {token_details['price_change_24h']:.2f}%
 - 14d Price Change: {token_details['price_change_14d']:.2f}%
-- Social Following: {token_details['twitter_followers']:,} Twitter followers
+- Social Following: {token_details['twitter_followers']:,}) Twitter followers
 
 Your analysis should be suitable for sophisticated investors who:
 - Understand DeFi fundamentals
@@ -265,65 +266,54 @@ Please use real-time market data and recent developments in your analysis."""
         return None
 
 # Report Generation Function
-def generate_investment_report(clients: APIClients, token_details: TokenDetails, tokenomics_analysis: str, project_research: str, market_context: str) -> Optional[str]:
+def generate_investment_report(clients: APIClients, token_details: TokenDetails, tokenomics_analysis: str, project_research: str, market_context: str) -> str:
     """
-    Generate a concise investment report aggregating all analyses
-    Returns the formatted report text
+    Generate a comprehensive investment report combining all analyses
+    Returns the final report text with opinionated, data-driven recommendations
     """
     try:
-        prompt = f"""As the Investment Committee Chair at a leading crypto investment firm, synthesize our research team's findings into an executive summary for the board:
+        prompt = f"""As the Chief Investment Officer of a leading crypto investment firm, analyze our research findings and provide your investment thesis:
 
 Token: {token_details['name']} ({token_details['symbol']})
 Chain: {token_details['chain']}
-Market Cap: ${token_details['market_cap']:,.2f}
+Key Metrics:
+- Market Cap: ${token_details['market_cap']:,.2f}
+- Market Cap/FDV Ratio: {token_details['market_cap_fdv_ratio']:.2f}
+- 24h Price Change: {token_details['price_change_24h']:.2f}%
+- 14d Price Change: {token_details['price_change_14d']:.2f}%
+- Social Following: {token_details['twitter_followers']:,} Twitter followers
 
-TOKENOMICS ANALYSIS:
+RESEARCH FINDINGS:
+
+1. Tokenomics Analysis:
 {tokenomics_analysis}
 
-PROJECT RESEARCH:
+2. Project Research:
 {project_research}
 
-MARKET CONTEXT:
+3. Market Context:
 {market_context}
 
-This report will be presented to:
-- Board members
-- Executive leadership
-- Key stakeholders
-- Investment partners
+Based on this research, provide your investment thesis and recommendations. Focus on:
+- Clear investment stance backed by specific data points from all three analyses
+- Most compelling opportunities and critical risks
+- Actionable entry/exit strategies and position management
+- Key metrics that would change your thesis
 
-Based on our team's comprehensive analyses:
-
-1. Investment Outlook (2-3 sentences)
-   - Overall sentiment
-   - Key market position
-   - Growth potential
-
-2. Key Catalysts (3-4 bullet points)
-   - Upcoming developments
-   - Market opportunities
-   - Competitive advantages
-
-3. Risk Factors (3-4 bullet points)
-   - Market risks
-   - Project-specific risks
-   - External threats
-
-4. Investment Recommendations
-   - Entry strategy
-   - Position sizing considerations
-   - Key metrics to monitor
-   - Time horizon"""
+Be opinionated and support your views with evidence from the research. Your recommendations will directly influence multi-million dollar allocation decisions."""
 
         completion = clients.openai_client.chat.completions.create(
             model="gpt-4o",
-            messages=[{
-                "role": "system",
-                "content": "You are the Investment Committee Chair at a prestigious crypto investment firm. Your recommendations directly influence multi-million dollar allocation decisions. Be decisive, clear, and thorough in your risk/reward assessment."
-            }, {
-                "role": "user",
-                "content": prompt
-            }],
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are the Chief Investment Officer at a prestigious crypto investment firm. Make clear, opinionated investment recommendations backed by data. Focus on actionable insights rather than summarizing research. Be decisive but support all major claims with evidence."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
             temperature=0.7
         )
         
@@ -487,105 +477,72 @@ def run(
     api_keys: Any,
     **kwargs: Any,
 ) -> Tuple[str, Optional[str], Optional[Dict[str, Any]], Any]:
+    """Run fundamental analysis and return structured response."""
     # default response
     response = "Invalid response"
+    metadata_dict = None
+    analysis_prompt = None
 
     try:
         clients = APIClients(api_keys)
-
+        
         print(f"\nAnalyzing prompt: {prompt}")
-        # Get CoinGecko ID from the prompt
-        coin_id = get_coingecko_id_from_prompt(clients, prompt)
-        if not coin_id:
-            print("\nCould not identify a specific cryptocurrency from your prompt.")
-            print("Generating general cryptocurrency market analysis instead...")
-            
-            analysis = get_general_market_analysis(clients)
-            if analysis:
-                print("\n=== CRYPTOCURRENCY MARKET ANALYSIS ===")
-                print(analysis)
-            return
-            
-        print(f"\nIdentified cryptocurrency with CoinGecko ID: {coin_id}")
-        print("Fetching details...")
         
-        details = get_token_details(coin_id)
-        if not details:
-            print("\nCould not fetch token details.")
-            print("Generating general cryptocurrency market analysis instead...")
-            
-            analysis = get_general_market_analysis(clients)
-            if analysis:
-                print("\n=== CRYPTOCURRENCY MARKET ANALYSIS ===")
-                print(analysis)
-            return
-            
-        # Display basic token information
-        print(f"\n{details['name']} ({details['symbol']})")
-        print(f"Chain: {details['chain']}")
-        print(f"Contract Address: {details['contract_address']}")
-        print(f"Market Cap: ${details['market_cap']:,.2f}")
-        print(f"Market Cap/FDV Ratio: {details['market_cap_fdv_ratio']:.2f}")
-        print(f"24h Price Change: {details['price_change_24h']:.2f}%")
-        print(f"14d Price Change: {details['price_change_14d']:.2f}%")
-        print(f"Twitter Followers: {details['twitter_followers']:,}")
+        # Get token ID from prompt
+        token_id = get_coingecko_id_from_prompt(clients, prompt)
+        if not token_id:
+            return "Could not determine which token to analyze. Please specify a valid token.", "", None, None
         
-        # Display links
-        print("\nLinks:")
-        for link_type, urls in details['links'].items():
-            if urls and isinstance(urls, list):
-                valid_urls = [url for url in urls if url]
-                if valid_urls:
-                    print(f"{link_type.replace('_', ' ').title()}:")
-                    for url in valid_urls:
-                        print(f"- {url}")
-            elif urls and isinstance(urls, str):
-                print(f"{link_type.replace('_', ' ').title()}: {urls}")
-            elif isinstance(urls, dict) and urls:
-                print(f"{link_type.replace('_', ' ').title()}:")
-                for sub_type, sub_urls in urls.items():
-                    if sub_urls:
-                        print(f"  {sub_type.title()}:")
-                        for url in sub_urls:
-                            if url:
-                                print(f"  - {url}")
+        # Get token details
+        token_details = get_token_details(token_id)
+        if not token_details:
+            return f"Could not fetch details for token {token_id}. Please verify the token exists.", "", None, None
         
-        # Display description
-        print("\nDescription:")
-        print(details['description'][:500] + "..." if len(details['description']) > 500 else details['description'])
-
         # Generate analyses
-        print("\nGenerating Tokenomics & Market Analysis...")
-        tokenomics_analysis = get_investment_analysis(clients, details)
-        if tokenomics_analysis:
-            print("\nTokenomics & Market Analysis:")
-            response = tokenomics_analysis
+        tokenomics_analysis = get_investment_analysis(clients, token_details)
+        project_research = get_project_research(clients, token_details)
+        market_context = get_market_context_analysis(clients, token_details)
         
-        print("\nResearching Project Details...")
-        project_research = get_project_research(clients, details)
-        if project_research:
-            print("\nProject Research:")
-            response = project_research
-            
-        print("\nAnalyzing Market Context & Competition...")
-        market_context = get_market_context_analysis(clients, details)
-        if market_context:
-            print("\nMarket Context Analysis:")
-            response = market_context
-            
-        if all([tokenomics_analysis, project_research, market_context]):
-            print("\nGenerating Investment Report...")
-            report = generate_investment_report(clients, details, tokenomics_analysis, project_research, market_context)
-            if report:
-                print("\n=== INVESTMENT REPORT ===")
-                response = report
+        if not all([tokenomics_analysis, project_research, market_context]):
+            return "Error generating complete analysis. Please try again.", "", None, None
+        
+        # Generate final report
+        analysis = generate_investment_report(clients, token_details, tokenomics_analysis, project_research, market_context)
+        
+        # Store all context in metadata
+        metadata_dict = {
+            "token_details": token_details,
+            "token_id": token_id,
+            "timestamp": datetime.now().isoformat(),
+            "analyses": {
+                "tokenomics": tokenomics_analysis,
+                "project": project_research,
+                "market": market_context
+            },
+            "metrics": {
+                "market_cap": token_details["market_cap"],
+                "market_cap_fdv_ratio": token_details["market_cap_fdv_ratio"],
+                "price_change_24h": token_details["price_change_24h"],
+                "price_change_14d": token_details["price_change_14d"],
+                "twitter_followers": token_details["twitter_followers"]
+            },
+            "chain_info": {
+                "chain": token_details["chain"],
+                "contract": token_details["contract_address"]
+            },
+            "links": token_details["links"]
+        }
+        
+        # Return just the analysis text as the response
+        response = analysis
 
     except Exception as e:
         print(f"An error occurred: {e}")
+        return str(e), "", None, None
 
     return (
         response,
         "",
-        None,
+        metadata_dict,
         None,
     )
