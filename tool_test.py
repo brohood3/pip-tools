@@ -1,6 +1,6 @@
 import os
 
-from query_extract import run
+from mech_query import run
 from typing import Dict, List
 
 # the following is copied over from the mech to simulate the API key retrieval
@@ -138,10 +138,10 @@ class TokenCounterCallback:
 keys = KeyChain({
     "dune": [os.getenv('DUNE_API_KEY')],
     "openai": [os.getenv('OPENAI_API_KEY')],
+    "perplexity": [os.getenv('PERPLEXITY_API_KEY')],
+    "flipside": [os.getenv('FLIPSIDE_API_KEY')],
 })
-
-# Test prompt for technical analysis
-prompt = "query 4508132 displays KLIMA pools on Base. What are the top 3 pools by apr and their aprs multiplied by 100?"
+prompt = "Show transactions for 0x7bfee91193d9df2ac0bfe90191d40f23c773c060 in the last 2 weeks"
 
 print(run(
     prompt=prompt,
