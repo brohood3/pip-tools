@@ -1,6 +1,6 @@
 import os
 
-from fundamental_analysis import run
+from mech_query import run
 from typing import Dict, List
 
 # the following is copied over from the mech to simulate the API key retrieval
@@ -139,8 +139,9 @@ keys = KeyChain({
     "coingecko": [os.getenv('COINGECKO_API_KEY')],
     "openai": [os.getenv('OPENAI_API_KEY')],
     "perplexity": [os.getenv('PERPLEXITY_API_KEY')],
+    "flipside": [os.getenv('FLIPSIDE_API_KEY')],
 })
-prompt = "Analyze OLAS price and predict future price."
+prompt = "Show transactions for 0x7bfee91193d9df2ac0bfe90191d40f23c773c060 in the last 2 weeks"
 
 print(run(
     prompt=prompt,
