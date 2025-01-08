@@ -142,79 +142,6 @@ def with_key_rotation(func: Any):
         return mech_response
     return wrapper
 
-@with_key_rotation
-def run(**kwargs) -> MechResponse:
-    """Run the task"""
-    # Initialize API clients
-    clients = APIClients(kwargs["api_keys"])
-    researcher = ResearchComponent(clients)
-    
-    # Get the question from prompt
-    question = kwargs["prompt"]
-    
-    # Gather research
-    research_results = {}
-    research_results["context"] = researcher.research_context(question)
-    research_results["factors"] = researcher.research_factors(question)
-    research_results["dates"] = researcher.research_dates(question)
-    research_results["alternatives"] = researcher.research_alternatives(question)
-    research_results["existing_predictions"] = researcher.research_existing_predictions(question)
-    
-    # Generate prediction using OpenAI
-    prompt = _create_prediction_prompt(question, research_results)
-    try:
-        response = clients.openai_client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": "You are a precise analytical engine specializing in future predictions, particularly for token prices. Always provide specific numerical predictions with ranges, even with low confidence. Never avoid making a prediction - if uncertain, provide a wider range and explain the uncertainties."},
-                {"role": "user", "content": prompt}
-            ]
-        )
-        prediction = response.choices[0].message.content
-        
-        # Create response dictionary with all data
-        result_dict = {
-            "prediction": prediction,
-            "question": question,
-            "research": research_results,
-            "timestamp": datetime.now().isoformat()
-        }
-        
-        # Create human-readable output
-        output_lines = [
-            "PREDICTION ANALYSIS",
-            "=" * 80,
-            prediction,
-            "\nQUESTION",
-            "=" * 80,
-            question,
-            "\nRESEARCH SUMMARY",
-            "=" * 80,
-            "\nContext and Background:",
-            research_results['context'],
-            "\nKey Influencing Factors:",
-            research_results['factors'],
-            "\nRelevant Dates and Timelines:",
-            research_results['dates'],
-            "\nAlternative Scenarios Considered:",
-            research_results['alternatives'],
-            "\nExisting Expert Predictions:",
-            research_results['existing_predictions'],
-            "\nTimestamp:", 
-            result_dict['timestamp']
-        ]
-        
-        # Return MechResponse tuple with formatted string and structured data
-        return "\n\n".join(output_lines), prompt, result_dict, None
-        
-    except Exception as e:
-        error_dict = {
-            "error": str(e),
-            "question": question,
-            "timestamp": datetime.now().isoformat()
-        }
-        return f"Failed to generate prediction: {str(e)}", None, error_dict, None
-
 def _create_prediction_prompt(question: str, research: Dict[str, str]) -> str:
     return f"""Based on the following research, provide a detailed prediction for this question. You MUST provide specific predictions with numerical ranges, even if confidence is low.
 
@@ -268,4 +195,56 @@ TIME HORIZON: [Specific timeframe for the prediction]
 CRITICAL UNCERTAINTIES:
 - [Key risk factor 1]
 - [Key risk factor 2]
-- [Key risk factor 3]""" 
+- [Key risk factor 3]"""
+
+@with_key_rotation
+def run(**kwargs) -> MechResponse:
+    """Run the task"""
+    # Initialize API clients
+    clients = APIClients(kwargs["api_keys"])
+    researcher = ResearchComponent(clients)
+    
+    # Get the question from prompt
+    question = kwargs["prompt"]
+    
+    # Gather research
+    research_results = {}
+    research_results["context"] = researcher.research_context(question)
+    research_results["factors"] = researcher.research_factors(question)
+    research_results["dates"] = researcher.research_dates(question)
+    research_results["alternatives"] = researcher.research_alternatives(question)
+    research_results["existing_predictions"] = researcher.research_existing_predictions(question)
+    
+    # Generate prediction using OpenAI
+    prompt = _create_prediction_prompt(question, research_results)
+    try:
+        response = clients.openai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "You are a precise analytical engine specializing in future predictions, particularly for token prices. Always provide specific numerical predictions with ranges, even with low confidence. Never avoid making a prediction - if uncertain, provide a wider range and explain the uncertainties."},
+                {"role": "user", "content": prompt}
+            ]
+        )
+        response = response.choices[0].message.content
+        
+        # Create response dictionary with all data
+        metadata_dict = {
+            "question": question,
+            "research": research_results,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        return (
+            response,
+            "",
+            metadata_dict,
+            None,
+        ) 
+        
+    except Exception as e:
+        error_dict = {
+            "error": str(e),
+            "question": question,
+            "timestamp": datetime.now().isoformat()
+        }
+        return f"Failed to generate prediction: {str(e)}", "", error_dict, None
