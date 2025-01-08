@@ -1,0 +1,223 @@
+tools:
+  future_predictor:
+    name: Future Predictor
+    description: Makes predictions about specific future events with measurable outcomes. Can handle questions about prices, technology releases, political elections, space missions, or any other events with clear outcomes. Do not use for subjective questions like "what's best" or "what's better".
+    use_cases:
+      - Predicting token prices and market events
+      - Forecasting technology developments
+      - Predicting political outcomes
+      - Estimating timeline of future events
+      - Making general future predictions
+    example_prompts:
+      - "What will be the price of ETH by the end of 2024?"
+      - "When will Arbitrum release their new upgrade?"
+      - "Will Bitcoin hit 100k this year?"
+      - "Who will Trump fire first?"
+      - "Will humans land on Mars by 2026?"
+      - "Which country will win the 2024 Olympics?"
+      - "When will AI reach AGI?"
+    required_params:
+      prompt: string
+      api_keys:
+        openai: string
+        perplexity: string
+    output_format:
+      text: string  # Formatted prediction with research
+      metadata:
+        prediction: string
+        question: string
+        research:
+          context: string
+          factors: string
+          dates: string
+          alternatives: string
+          existing_predictions: string
+        timestamp: string
+
+  trade_history_query:
+    name: Trade History Query
+    description: Looks up the on-chain trading history for one or multiple wallet addresses.
+    use_cases:
+      - Looking up a wallet's trading history
+    example_prompts:
+      - "Show me what this wallet traded: 0x742d35Cc6634C0532925a3b844Bc454e4438f44e"
+      - "How much ETH did 0x123... buy last month?"
+      - "What tokens has this address traded recently: 0x456..."
+    required_params:
+      prompt: string
+      api_keys:
+        flipside: string
+        openai: string
+    output_format:
+      text: string  # Formatted summary of trades
+      metadata:
+        transactions: array
+        summary:
+          total_volume: string
+          unique_tokens: number
+          most_traded: string
+
+  query_extract:
+    name: Query Data Extractor
+    description: Extracts specific data points from on-chain data using a single Dune query. Use when you need precise to extract specific data points from a single query. Only use when a specific query number is provided.
+    use_cases:
+      - Getting exact trading volumes from a query
+      - Counting unique addresses from a query
+      - Extracting specific metrics from a query
+    example_prompts:
+      - "What was the total trading volume of UNI last week from query 123?"
+      - "How many unique traders used Uniswap v3 yesterday from query 123?"
+      - "What's the average gas cost for Arbitrum transactions in query 123?"
+    required_params:
+      prompt: string
+      api_keys:
+        dune: string
+    output_format:
+      text: string  # Formatted answer to the specific question
+      metadata:
+        query_details:
+          query_id: number
+          question: string
+          total_row_count: number
+          returned_row_count: number
+          column_names: array
+          execution_time: string
+          last_refresh_time: string
+        extracted_data: any
+
+  query_report:
+    name: Query Report Generator
+    description: Generates a report from on-chain data using a single dune query. Use for broader analysis of a single dune query. Only use when a specific query number is provided.
+    use_cases:
+      - Creating protocol usage reports
+      - Analyzing trading patterns
+      - Generating market insights
+    example_prompts:
+      - "Generate a report on Uniswap v3 usage this month from query 123"
+      - "Analyze the trading patterns on Arbitrum this week from query 123"
+      - "Query 123 is a about MEV activity in the last 24 hours. Give me analysis on it"
+    required_params:
+      prompt: string
+      api_keys:
+        dune: string
+    output_format:
+      text: string  # Formatted analysis report
+      metadata:
+        query_details:
+          query_id: number
+          description: string
+          row_count: number
+          column_names: array
+          execution_time: string
+          last_refresh_time: string
+        analysis: string
+        insights: array
+
+  fundamental_analysis:
+    name: Token Research
+    description: Performs deep research on a single token, blockchain, or protocol's fundamentals. Only use when analyzing one specific project's metrics, team, technology, and market position. Do not use for comparisons or multiple projects.
+    use_cases:
+      - Researching a specific token's fundamentals
+      - Checking current status of a single project
+      - Understanding one token's recent developments
+      - Analyzing a single token's health
+    example_prompts:
+      - "What's going on with Arbitrum lately?"
+      - "Do a deep dive on the LINK token"
+      - "Analyze the fundamentals of Optimism"
+      - "What's the state of ETH?"
+    required_params:
+      prompt: string
+      api_keys:
+        openai: string
+        perplexity: string
+    output_format:
+      text: string  # Formatted analysis report
+      metadata:
+        token: string
+        analysis:
+          tokenomics: string
+          team: string
+          technology: string
+          market: string
+          risks: string
+        score: number
+        recommendation: string
+
+  fundamental_analysis_trending:
+    name: Most Trending Token Analysis
+    description: Finds the single most trending token right now and analyzes it. Only use when someone specifically asks about which token is currently the most trending/popular and wants analysis of it.
+    use_cases:
+      - Finding and analyzing the current #1 trending token
+      - Researching the most popular token right now
+    example_prompts:
+      - "What's the most trending token right now and why?"
+      - "Analyze the current hottest token"
+      - "Give me a fundamental analysis of the most trending token"
+    required_params:
+      prompt: string
+      api_keys:
+        openai: string
+        perplexity: string
+        coingecko: string
+    output_format:
+      text: string  # Formatted analysis of the trending token
+      metadata:
+        token_name: string
+        analysis:
+          momentum_score: number
+          volume_change: string
+          social_metrics: object
+          fundamental_score: number
+          research: object
+
+  ta_api_analysis:
+    name: Technical Chart Analysis
+    description: Analyzes technical indicators and chart patterns for a single trading pair. Only use for price action and technical analysis of one specific token pair.
+    use_cases:
+      - Analyzing technical indicators for one trading pair
+      - Checking chart patterns for a specific token
+      - Getting trading signals for a single pair
+    example_prompts:
+      - "What do the technicals show for ETH/USD?"
+      - "Is BTC looking bullish or bearish right now?"
+      - "Show me the technical analysis for SOL/USD on the 4h timeframe"
+    required_params:
+      prompt: string
+      api_keys:
+        taapi: string
+        openai: string
+    output_format:
+      text: string  # Formatted technical analysis
+      metadata:
+        symbol: string
+        interval: string
+        indicators:
+          trend:
+            ema: object  # Multiple EMAs (20, 50, 200)
+            supertrend: object  # value and direction
+            adx: number
+            dmi: object  # adx, pdi, mdi
+            psar: number
+          momentum:
+            rsi: number
+            macd: object  # value, signal, histogram
+            stoch: object  # K and D values
+            mfi: number
+            cci: number
+          patterns:
+            doji: number  # 0, 100, or -100
+            engulfing: number  # 0, 100, or -100
+            hammer: number  # 0, 100, or -100
+            shootingstar: number  # 0, 100, or -100
+          volatility:
+            bbands: object  # upper, middle, lower
+            atr: number
+            volume: number
+            vwap: number
+          volume:
+            ad: number  # Chaikin A/D
+            adosc: number  # A/D Oscillator
+            cmf: number  # Money Flow
+            obv: number  # On Balance Volume
+            vosc: number  # Volume Oscillator 
