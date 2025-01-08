@@ -3,4 +3,5 @@ numpy
 ta
 requests
 python-dotenv
-openai 
+openai
+pyyaml 
