@@ -1,6 +1,6 @@
 import os
 
-from future_predictor import run
+from trade_history_query import run
 from typing import Dict, List
 
 # the following is copied over from the mech to simulate the API key retrieval
@@ -141,7 +141,7 @@ keys = KeyChain({
     "perplexity": [os.getenv('PERPLEXITY_API_KEY')],
     "flipside": [os.getenv('FLIPSIDE_API_KEY')],
 })
-prompt = "Who will Trump fire first during his presidency?"
+prompt = "tell me what this address buying and selling: 0xB714Ccc9081a537dF2AA930A4172175D9AB758ad"
 
 print(run(
     prompt=prompt,
