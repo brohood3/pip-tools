@@ -4,21 +4,24 @@ FastAPI server for fundamental analysis endpoints.
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Literal
 import uvicorn
-from fundamental_analysis import (
-    get_coingecko_id_from_prompt,
-    get_token_details,
-    get_investment_analysis,
-    get_project_research,
-    get_market_context_analysis,
-    generate_investment_report
-)
+import fundamental_analysis_optimistic as optimistic
+import fundamental_analysis_balanced as balanced
 
 app = FastAPI(title="Crypto Fundamental Analysis API")
 
 class AnalysisRequest(BaseModel):
     prompt: str
+    style: Literal["optimistic", "balanced"] = "balanced"
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "prompt": "Analyze Bitcoin fundamentals",
+                "style": "balanced"
+            }
+        }
 
 class AnalysisResponse(BaseModel):
     token_id: str
@@ -28,31 +31,38 @@ class AnalysisResponse(BaseModel):
     tokenomics_analysis: Optional[str]
     project_research: Optional[str]
     market_context: Optional[str]
+    analysis_style: str
 
-@app.post("/analyze", response_model=AnalysisResponse)
+@app.post("/fundamental-analysis", response_model=AnalysisResponse)
 async def analyze_token(request: AnalysisRequest):
-    """Generate fundamental analysis for a token based on a prompt."""
+    """Generate fundamental analysis for a token based on a prompt.
+    
+    - style: Choose between 'optimistic' or 'balanced' analysis approach
+    """
     try:
+        # Select analysis module based on style
+        analysis = optimistic if request.style == "optimistic" else balanced
+        
         # Get CoinGecko ID from prompt
-        token_id = get_coingecko_id_from_prompt(request.prompt)
+        token_id = analysis.get_coingecko_id_from_prompt(request.prompt)
         if not token_id:
             raise HTTPException(status_code=400, detail="Could not determine which token to analyze")
         
         # Get token details
-        token_details = get_token_details(token_id)
+        token_details = analysis.get_token_details(token_id)
         if not token_details:
             raise HTTPException(status_code=404, detail=f"Could not fetch details for token {token_id}")
         
         # Generate analyses
-        tokenomics_analysis = get_investment_analysis(token_details)
-        project_research = get_project_research(token_details)
-        market_context = get_market_context_analysis(token_details)
+        tokenomics_analysis = analysis.get_investment_analysis(token_details)
+        project_research = analysis.get_project_research(token_details)
+        market_context = analysis.get_market_context_analysis(token_details)
         
         if not all([tokenomics_analysis, project_research, market_context]):
             raise HTTPException(status_code=500, detail="Error generating complete analysis")
         
         # Generate final report
-        final_report = generate_investment_report(
+        final_report = analysis.generate_investment_report(
             token_details,
             tokenomics_analysis,
             project_research,
@@ -69,7 +79,8 @@ async def analyze_token(request: AnalysisRequest):
             report=final_report,
             tokenomics_analysis=tokenomics_analysis,
             project_research=project_research,
-            market_context=market_context
+            market_context=market_context,
+            analysis_style=request.style
         )
         
     except Exception as e:
