@@ -81,7 +81,7 @@ def get_token_details(token_id: str) -> Optional[TokenDetails]:
 def get_investment_analysis(token_details: TokenDetails) -> Optional[str]:
     """Get focused tokenomics and market sentiment analysis using GPT."""
     try:
-        prompt = f"""As a seasoned tokenomics expert at a top crypto venture capital firm, analyze this token for our institutional investors:
+        prompt = f"""As a forward-thinking tokenomics expert at a leading crypto venture capital firm, analyze this token's growth potential:
 
 Token: {token_details['name']} ({token_details['symbol']})
 Key Metrics:
@@ -91,32 +91,26 @@ Key Metrics:
 - 14d Price Change: {token_details['price_change_14d']:.2f}%
 - Social Following: {token_details['twitter_followers']:,} Twitter followers
 
-Your analysis should be suitable for sophisticated investors who:
-- Understand DeFi fundamentals
-- Are looking for detailed technical analysis
-- Need clear risk/reward assessments
-- Require institutional-grade due diligence
+Focus on:
+1. Growth Potential:
+   - How the Market Cap/FDV ratio ({token_details['market_cap_fdv_ratio']:.2f}) suggests room for expansion
+   - Potential catalysts in token distribution
+   - Supply dynamics that could drive value
+   - Comparison to successful projects at similar stages
 
-Please provide your VC firm's analysis in the following format:
+2. Market Momentum:
+   - Bullish patterns in price action ({token_details['price_change_24h']:.2f}% vs {token_details['price_change_14d']:.2f}%)
+   - Social growth potential ({token_details['twitter_followers']:,} followers)
+   - Market conditions favoring growth
 
-1. Tokenomics Deep Dive:
-   - Analyze the Market Cap/FDV ratio of {token_details['market_cap_fdv_ratio']:.2f}
-   - What does this ratio suggest about token distribution and future dilution?
-   - Compare to industry standards and identify potential red flags
-   - Estimate locked/circulating supply implications
-
-2. Market Momentum Analysis:
-   - Interpret the 24h ({token_details['price_change_24h']:.2f}%) vs 14d ({token_details['price_change_14d']:.2f}%) price action
-   - What does this trend suggest about market sentiment?
-   - Analyze social metrics impact (Twitter following of {token_details['twitter_followers']:,})
-   - Compare market cap to social engagement ratio"""
+Highlight the unique opportunities and growth catalysts while acknowledging any temporary challenges."""
 
         completion = openai_client.chat.completions.create(
             model="gpt-4",
             messages=[
                 {
                     "role": "system",
-                    "content": "You are the head of tokenomics research at a prestigious crypto venture capital firm. Your analyses influence multi-million dollar investment decisions. Be thorough, technical, and unbiased in your assessment."
+                    "content": "You are a visionary tokenomics researcher at a prestigious crypto venture capital firm. You're known for identifying promising projects early and seeing potential where others see challenges. Your analyses focus on growth opportunities and catalysts that could drive success, while still maintaining analytical credibility."
                 },
                 {
                     "role": "user",
@@ -135,7 +129,6 @@ Please provide your VC firm's analysis in the following format:
 def get_project_research(token_details: TokenDetails) -> Optional[str]:
     """Research the project using Perplexity API to analyze links and provide insights."""
     try:
-        # Prepare relevant links for research
         research_links = []
         important_link_types = ['homepage', 'blockchain_site', 'whitepaper', 'announcement_url', 'twitter_screen_name']
         
@@ -151,7 +144,7 @@ def get_project_research(token_details: TokenDetails) -> Optional[str]:
         
         links_text = "\n".join([f"- {url}" for url in research_links])
         
-        prompt = f"""As the lead blockchain researcher at a top-tier crypto investment fund, conduct comprehensive due diligence:
+        prompt = f"""As an innovation-focused blockchain researcher, analyze this project's potential:
 
 Project: {token_details['name']} ({token_details['symbol']})
 Chain: {token_details['chain']}
@@ -161,27 +154,32 @@ Description: {token_details['description']}
 Available Sources:
 {links_text}
 
-Please provide an institutional-grade analysis covering:
-1. Project Overview & Niche:
-   - What problem does it solve?
-   - What's unique about their approach?
-   - What is their competition?
+Explore and highlight:
+1. Innovation & Vision:
+   - Unique technological advantages
+   - Market problems being solved
+   - Potential for industry disruption
+   - Growth opportunities
 
-2. Ecosystem Analysis:
-   - Key partnerships and integrations
-   - Developer activity and community
-   - Infrastructure and technology stack
+2. Team & Development:
+   - Development momentum
+   - Community growth initiatives
+   - Technical capabilities
+   - Innovation pipeline
 
-3. Recent & Upcoming Events:
-   - Latest developments
-   - Roadmap milestones
-   - Upcoming features or releases"""
+3. Future Catalysts:
+   - Upcoming milestones
+   - Partnership opportunities
+   - Market expansion potential
+   - Growth accelerators
+
+Focus on the project's strengths and potential while acknowledging areas for improvement."""
 
         response = perplexity_client.chat.completions.create(
             model="llama-3.1-sonar-large-128k-online",
             messages=[{
                 "role": "system",
-                "content": "You are a senior blockchain researcher at a $500M crypto fund. Your research directly influences investment allocation decisions. Maintain professional skepticism and support claims with evidence."
+                "content": "You are a forward-thinking blockchain researcher who specializes in identifying innovative projects with high potential. You focus on understanding how projects can succeed and grow, while maintaining analytical credibility. Your analysis emphasizes opportunities while acknowledging the path to achieving them."
             }, {
                 "role": "user",
                 "content": prompt
@@ -197,36 +195,45 @@ Please provide an institutional-grade analysis covering:
 def get_market_context_analysis(token_details: TokenDetails) -> Optional[str]:
     """Analyze external market factors and competitive landscape."""
     try:
-        prompt = f"""As the Chief Market Strategist at a leading digital asset investment firm, provide strategic market intelligence:
+        prompt = f"""As a growth-focused Market Strategist, analyze this token's market potential:
 
 Token: {token_details['name']} ({token_details['symbol']})
 Chain: {token_details['chain']}
 Category: Based on description: "{token_details['description']}"
 
-Please provide your strategic market assessment covering:
+Provide strategic insights on:
 
-1. Market Narrative Analysis:
-   - Current state of this token's category/niche
-   - Similar projects/tokens trending
-   - Drivers of interest
-   - Timing with broader market trends
+1. Market Opportunity:
+   - Growth potential in token's category/niche
+   - Emerging market trends supporting success
+   - Adoption catalysts
+   - Market expansion possibilities
 
-2. Chain Ecosystem Analysis:
-   - Current state of {token_details['chain']} ecosystem
-   - Recent developments or challenges
-   - Competitive advantages/disadvantages
+2. Ecosystem Advantages:
+   - Strategic partnerships and synergies
+   - Developer ecosystem potential
+   - Community growth opportunities
+   - {token_details['chain']} ecosystem benefits
 
-3. Competitive Landscape:
-   - Main competitors
-   - Market share distribution
-   - Key differentiators
-   - Dominant players or emerging threats"""
+3. Development Momentum:
+   - Recent achievements
+   - Promising roadmap milestones
+   - Innovation pipeline
+   - Growth accelerators
+
+4. Competitive Edge:
+   - Unique value propositions
+   - Market positioning strengths
+   - First-mover advantages
+   - Growth opportunities vs competitors
+
+Focus on identifying paths to success while acknowledging the steps needed to achieve them."""
 
         response = perplexity_client.chat.completions.create(
             model="llama-3.1-sonar-large-128k-online",
             messages=[{
                 "role": "system",
-                "content": "You are the Chief Market Strategist at a prestigious digital asset investment firm. Focus on macro trends, market dynamics, and strategic positioning."
+                "content": "You are a growth-focused Market Strategist who excels at identifying market opportunities and expansion potential. Your analysis emphasizes paths to success while maintaining credibility through data-driven insights. You help others understand how projects can capture market opportunities."
             }, {
                 "role": "user",
                 "content": prompt
@@ -242,7 +249,7 @@ Please provide your strategic market assessment covering:
 def generate_investment_report(token_details: TokenDetails, tokenomics_analysis: str, project_research: str, market_context: str) -> str:
     """Generate a comprehensive investment report combining all analyses."""
     try:
-        prompt = f"""As the Chief Investment Officer of a leading crypto investment firm, analyze our research findings and provide your investment thesis:
+        prompt = f"""As a visionary Chief Investment Officer, synthesize this research into a growth-focused investment thesis:
 
 Token: {token_details['name']} ({token_details['symbol']})
 Chain: {token_details['chain']}
@@ -264,18 +271,20 @@ RESEARCH FINDINGS:
 3. Market Context:
 {market_context}
 
-Based on this research, provide your investment thesis and recommendations. Focus on:
-- Clear investment stance backed by specific data points
-- Most compelling opportunities and critical risks
-- Actionable entry/exit strategies
-- Key metrics that would change your thesis"""
+Synthesize a growth-focused thesis covering:
+- Key opportunities and growth catalysts
+- Path to capturing market potential
+- Strategic advantages and moats
+- Milestones that could accelerate growth
+
+Focus on how the project can succeed while acknowledging the steps needed to realize its potential."""
 
         completion = openai_client.chat.completions.create(
             model="gpt-4",
             messages=[
                 {
                     "role": "system",
-                    "content": "You are the Chief Investment Officer at a prestigious crypto investment firm. Make clear, opinionated investment recommendations backed by data. Be decisive but support all major claims with evidence."
+                    "content": "You are a visionary Chief Investment Officer known for identifying high-potential opportunities early. Your investment theses focus on growth potential and paths to success, while maintaining credibility through data-driven analysis. You help others understand how projects can achieve their potential."
                 },
                 {
                     "role": "user",
