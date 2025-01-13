@@ -42,8 +42,27 @@ class TokenDetails(TypedDict):
     twitter_followers: int
     links: Dict[str, List[str]]
 
-def get_token_details(token_id: str) -> Optional[TokenDetails]:
-    """Get detailed information about a token from CoinGecko."""
+def create_default_token_details(name: str, symbol: str = "", chain: str = "unknown") -> TokenDetails:
+    """Create default token details when CoinGecko data is not available."""
+    return TokenDetails(
+        name=name,
+        symbol=symbol.upper() if symbol else name.upper(),
+        chain=chain,
+        contract_address="",
+        description="",
+        market_cap=0.0,
+        market_cap_fdv_ratio=0.0,
+        price_change_24h=0.0,
+        price_change_14d=0.0,
+        twitter_followers=0,
+        links={}
+    )
+
+def get_token_details(token_id: Optional[str], token_name: str) -> TokenDetails:
+    """Get detailed information about a token from CoinGecko, or return default details if not found."""
+    if not token_id:  # Only check for token_id, since we know COINGECKO_API_KEY exists
+        return create_default_token_details(token_name)
+
     try:
         url = f"https://api.coingecko.com/api/v3/coins/{token_id}"
         headers = {
@@ -57,7 +76,7 @@ def get_token_details(token_id: str) -> Optional[TokenDetails]:
         
         # Get first platform as chain and its contract address
         platforms = data.get('platforms', {})
-        chain = next(iter(platforms.keys())) if platforms else 'ethereum'
+        chain = next(iter(platforms.keys())) if platforms else 'unknown'
         contract_address = platforms.get(chain, '') if platforms else ''
         
         return TokenDetails(
@@ -75,32 +94,45 @@ def get_token_details(token_id: str) -> Optional[TokenDetails]:
         )
         
     except requests.exceptions.RequestException as e:
-        print(f"Error fetching token details: {e}")
-        return None
+        print(f"Error fetching token details from CoinGecko: {e}")
+        return create_default_token_details(token_name)
 
-def get_investment_analysis(token_details: TokenDetails) -> Optional[str]:
+def get_investment_analysis(token_details: TokenDetails, original_prompt: str) -> Optional[str]:
     """Get focused tokenomics and market sentiment analysis using GPT."""
     try:
+        # Adjust prompt based on available data
+        metrics = []
+        if token_details['market_cap'] > 0:
+            metrics.append(f"- Market Cap: ${token_details['market_cap']:,.2f}")
+        if token_details['market_cap_fdv_ratio'] > 0:
+            metrics.append(f"- Market Cap/FDV Ratio: {token_details['market_cap_fdv_ratio']:.2f}")
+        if token_details['price_change_24h'] != 0:
+            metrics.append(f"- 24h Price Change: {token_details['price_change_24h']:.2f}%")
+        if token_details['price_change_14d'] != 0:
+            metrics.append(f"- 14d Price Change: {token_details['price_change_14d']:.2f}%")
+        if token_details['twitter_followers'] > 0:
+            metrics.append(f"- Social Following: {token_details['twitter_followers']:,} Twitter followers")
+
+        metrics_text = "\n".join(metrics) if metrics else "Market data not available"
+
         prompt = f"""As a forward-thinking tokenomics expert at a leading crypto venture capital firm, analyze this token's growth potential:
+
+Original Request: "{original_prompt}"
 
 Token: {token_details['name']} ({token_details['symbol']})
 Key Metrics:
-- Market Cap: ${token_details['market_cap']:,.2f}
-- Market Cap/FDV Ratio: {token_details['market_cap_fdv_ratio']:.2f}
-- 24h Price Change: {token_details['price_change_24h']:.2f}%
-- 14d Price Change: {token_details['price_change_14d']:.2f}%
-- Social Following: {token_details['twitter_followers']:,} Twitter followers
+{metrics_text}
 
 Focus on:
 1. Growth Potential:
-   - How the Market Cap/FDV ratio ({token_details['market_cap_fdv_ratio']:.2f}) suggests room for expansion
+   - Market positioning and expansion opportunities
    - Potential catalysts in token distribution
    - Supply dynamics that could drive value
    - Comparison to successful projects at similar stages
 
 2. Market Momentum:
-   - Bullish patterns in price action ({token_details['price_change_24h']:.2f}% vs {token_details['price_change_14d']:.2f}%)
-   - Social growth potential ({token_details['twitter_followers']:,} followers)
+   - Growth indicators and market sentiment
+   - Social and community growth potential
    - Market conditions favoring growth
 
 Highlight the unique opportunities and growth catalysts while acknowledging any temporary challenges."""
@@ -126,7 +158,7 @@ Highlight the unique opportunities and growth catalysts while acknowledging any 
         print(f"Error generating analysis: {e}")
         return None
 
-def get_project_research(token_details: TokenDetails) -> Optional[str]:
+def get_project_research(token_details: TokenDetails, original_prompt: str) -> Optional[str]:
     """Research the project using Perplexity API to analyze links and provide insights."""
     try:
         research_links = []
@@ -142,9 +174,11 @@ def get_project_research(token_details: TokenDetails) -> Optional[str]:
                     else:
                         research_links.append(urls)
         
-        links_text = "\n".join([f"- {url}" for url in research_links])
+        links_text = "\n".join([f"- {url}" for url in research_links]) if research_links else "No official links available"
         
         prompt = f"""As an innovation-focused blockchain researcher, analyze this project's potential:
+
+Original Request: "{original_prompt}"
 
 Project: {token_details['name']} ({token_details['symbol']})
 Chain: {token_details['chain']}
@@ -192,10 +226,12 @@ Focus on the project's strengths and potential while acknowledging areas for imp
         print(f"Error generating project research: {e}")
         return None
 
-def get_market_context_analysis(token_details: TokenDetails) -> Optional[str]:
+def get_market_context_analysis(token_details: TokenDetails, original_prompt: str) -> Optional[str]:
     """Analyze external market factors and competitive landscape."""
     try:
         prompt = f"""As a growth-focused Market Strategist, analyze this token's market potential:
+
+Original Request: "{original_prompt}"
 
 Token: {token_details['name']} ({token_details['symbol']})
 Chain: {token_details['chain']}
@@ -246,10 +282,12 @@ Focus on identifying paths to success while acknowledging the steps needed to ac
         print(f"Error generating market context analysis: {e}")
         return None
 
-def generate_investment_report(token_details: TokenDetails, tokenomics_analysis: str, project_research: str, market_context: str) -> str:
+def generate_investment_report(token_details: TokenDetails, tokenomics_analysis: str, project_research: str, market_context: str, original_prompt: str) -> str:
     """Generate a comprehensive investment report combining all analyses."""
     try:
         prompt = f"""As a visionary Chief Investment Officer, synthesize this research into a growth-focused investment thesis:
+
+Original Request: "{original_prompt}"
 
 Token: {token_details['name']} ({token_details['symbol']})
 Chain: {token_details['chain']}
@@ -403,29 +441,44 @@ def main():
         
         print(f"\nAnalyzing prompt: {prompt}")
         
-        # Get CoinGecko ID from prompt
+        # Try to get CoinGecko ID from prompt
         print("\nIdentifying token...")
         token_id = get_coingecko_id_from_prompt(prompt)
+        
+        # Extract token name from prompt if no CoinGecko ID found
         if not token_id:
-            print("Could not determine which token to analyze. Please specify a valid token in your prompt.")
-            return
+            print("Could not find exact match on CoinGecko. Using token name from prompt.")
+            # Use Perplexity to extract token name from prompt
+            name_prompt = f"""Extract the name of the cryptocurrency or token from this prompt: "{prompt}"
+            Respond with ONLY the token name, nothing else."""
+            
+            response = perplexity_client.chat.completions.create(
+                model="llama-3.1-sonar-large-128k-online",
+                messages=[{
+                    "role": "system",
+                    "content": "Extract only the token name from the prompt. Respond with just the name, no explanation."
+                }, {
+                    "role": "user",
+                    "content": name_prompt
+                }]
+            )
+            token_name = response.choices[0].message.content.strip()
+        else:
+            token_name = token_id.replace('-', ' ').title()
         
         # Get token details
-        print(f"\nFetching details for {token_id}...")
-        token_details = get_token_details(token_id)
-        if not token_details:
-            print(f"Could not fetch details for token {token_id}. Please verify the token exists.")
-            return
+        print(f"\nFetching details for {token_name}...")
+        token_details = get_token_details(token_id, token_name)
         
         # Generate analyses
         print("\nGenerating tokenomics analysis...")
-        tokenomics_analysis = get_investment_analysis(token_details)
+        tokenomics_analysis = get_investment_analysis(token_details, prompt)
         
         print("\nResearching project details...")
-        project_research = get_project_research(token_details)
+        project_research = get_project_research(token_details, prompt)
         
         print("\nAnalyzing market context...")
-        market_context = get_market_context_analysis(token_details)
+        market_context = get_market_context_analysis(token_details, prompt)
         
         if not all([tokenomics_analysis, project_research, market_context]):
             print("Error generating complete analysis. Please try again.")
@@ -433,7 +486,7 @@ def main():
         
         # Generate final report
         print("\nGenerating comprehensive investment report...")
-        final_report = generate_investment_report(token_details, tokenomics_analysis, project_research, market_context)
+        final_report = generate_investment_report(token_details, tokenomics_analysis, project_research, market_context, prompt)
         
         # Print the final report
         print("\n" + "="*80)
@@ -443,11 +496,12 @@ def main():
         
         # Save report to file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"analysis_{token_id}_{timestamp}.txt"
+        filename = f"analysis_{token_name.lower().replace(' ', '_')}_{timestamp}.txt"
         
         with open(filename, 'w') as f:
             f.write(f"Investment Report for {token_details['name']} ({token_details['symbol']})\n")
             f.write("="*80 + "\n\n")
+            f.write("Original Request: {prompt}\n\n")
             f.write("TOKENOMICS ANALYSIS\n")
             f.write("-"*80 + "\n")
             f.write(tokenomics_analysis + "\n\n")
