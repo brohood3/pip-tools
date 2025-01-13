@@ -4,4 +4,6 @@ ta
 requests
 python-dotenv
 openai
-pyyaml 
+pyyaml
+fastapi
+uvicorn[standard] 

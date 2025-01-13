@@ -1,6 +1,6 @@
 import os
 
-from trade_history_query import run
+from trade_history_query_mech import run
 from typing import Dict, List
 
 # the following is copied over from the mech to simulate the API key retrieval

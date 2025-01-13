@@ -1,158 +1,110 @@
-# Converting a Script to a Mech Tool
+# Crypto Fundamental Analysis API
 
-This guide provides step-by-step instructions for converting a Python script into a mech tool, based on a real-world example of converting `fundamental_analysis.py`.
+A powerful API that provides comprehensive fundamental analysis for cryptocurrency tokens, including tokenomics, project research, and market context.
 
-## Prerequisites
+## Features
 
-- Your original Python script
-- Understanding of the script's dependencies and API requirements
+- Token identification from natural language prompts
+- Detailed tokenomics analysis
+- Project research and ecosystem analysis
+- Market context and competitive landscape
+- Comprehensive investment reports
+- Full API documentation with Swagger UI
 
-## Steps
+## Local Setup
 
-### 1. Define the Response Type
-
-Add the standard mech response type at the top of your file:
-
-```python
-from typing import List, Dict, Optional, TypedDict, Tuple, Any, Callable
-
-MechResponse = Tuple[str, Optional[str], Optional[Dict[str, Any]], Any, Any]
+1. Clone the repository:
+```bash
+git clone <your-repo-url>
+cd <repo-directory>
 ```
 
-### 2. Modify API Client Management
-
-1. Update your API client class to accept keys through parameters instead of environment variables:
-
-```python
-class APIClients:
-    def __init__(self, api_keys: Any):
-        self.service1_key = api_keys["service1"]
-        self.service2_key = api_keys["service2"]
-        
-        if not all([self.service1_key, self.service2_key]):
-            raise ValueError("Missing required API keys")
+2. Create a virtual environment:
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-### 3. Convert Print Statements to Return Values
-
-Instead of printing results, store them in variables to return:
-
-```python
-# Before
-print("\nTokenomics & Market Analysis:")
-print(tokenomics_analysis)
-
-# After
-response = tokenomics_analysis
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
 ```
 
-### 4. Create the Run Function
-
-Replace your `main()` function with a `run()` function that accepts kwargs:
-
-```python
-@with_key_rotation
-def run(
-    prompt: str,
-    api_keys: Any,
-    **kwargs: Any,
-) -> Tuple[str, Optional[str], Optional[Dict[str, Any]], Any]:
-    try:
-        clients = APIClients(api_keys)
-        # Your implementation here
-        return response, "", None, None
-    except Exception as e:
-        return str(e), "", None, None
+4. Create a `.env` file with your API keys:
+```
+COINGECKO_API_KEY=your_coingecko_key
+OPENAI_API_KEY=your_openai_key
+PERPLEXITY_API_KEY=your_perplexity_key
 ```
 
-### 5. Add Key Rotation Support
-
-Add the key rotation decorator to handle API rate limits:
-
-```python
-def with_key_rotation(func: Callable):
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs) -> MechResponse:
-        api_keys = kwargs["api_keys"]
-        retries_left: Dict[str, int] = api_keys.max_retries()
-
-        def execute() -> MechResponse:
-            try:
-                result = func(*args, **kwargs)
-                return result + (api_keys,)
-            except openai.RateLimitError as e:
-                if retries_left["openai"] <= 0 and retries_left["openrouter"] <= 0:
-                    raise e
-                retries_left["openai"] -= 1
-                retries_left["openrouter"] -= 1
-                api_keys.rotate("openai")
-                api_keys.rotate("openrouter")
-                return execute()
-            except Exception as e:
-                return str(e), "", None, None, api_keys
-
-        mech_response = execute()
-        return mech_response
-
-    return wrapper
+5. Run the server:
+```bash
+python api.py
 ```
 
-### 6. Testing
+The API will be available at `http://localhost:8000`
+Documentation is available at `http://localhost:8000/docs`
 
-Create or modify the test file (`tool_test.py`):
+## API Usage
 
-```python
-import os
-from your_tool import run
-from typing import Dict, List
+### Generate Analysis
 
-# Setup keys
-keys = KeyChain({
-    "service1": [os.getenv('SERVICE1_API_KEY')],
-    "service2": [os.getenv('SERVICE2_API_KEY')],
-})
-
-# Test the tool
-print(run(
-    prompt="Your test prompt",
-    api_keys=keys,
-    counter_callback=TokenCounterCallback(),
-))
+```bash
+curl -X POST http://localhost:8000/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "Analyze Bitcoin fundamentals"}'
 ```
 
-## Best Practices
+### Response Format
 
-1. **API Key Management**
-   - Remove all direct environment variable access
-   - Use the KeyChain class for key management
-   - Support key rotation for rate-limited services
+```json
+{
+  "token_id": "bitcoin",
+  "token_name": "Bitcoin",
+  "token_symbol": "BTC",
+  "report": "Comprehensive investment analysis...",
+  "tokenomics_analysis": "Detailed tokenomics breakdown...",
+  "project_research": "Project research findings...",
+  "market_context": "Market analysis..."
+}
+```
 
-2. **Error Handling**
-   - Return errors in the mech response format
-   - Handle API-specific errors (like rate limits) appropriately
-   - Include meaningful error messages
+## Deployment
 
-3. **Response Format**
-   - Convert all print statements to return values
-   - Return the 4-tuple mech response format
-   - Use the response string for primary output
+### Deploy to Render
 
-4. **Testing**
-   - Use the standard test structure
-   - Test with real API keys
-   - Test error cases and rate limit handling
+1. Create a new account on [Render](https://render.com)
+2. Connect your GitHub repository
+3. Click "New Web Service"
+4. Select your repository
+5. Render will automatically detect the configuration from `render.yaml`
+6. Add your environment variables in the Render dashboard:
+   - COINGECKO_API_KEY
+   - OPENAI_API_KEY
+   - PERPLEXITY_API_KEY
+7. Deploy!
 
-## Common Issues
+Your API will be available at `https://<service-name>.onrender.com`
 
-1. **Environment Variables**
-   - Remove all direct `os.getenv()` calls
-   - Pass all API keys through the `api_keys` parameter
+### Alternative Deployment Options
 
-2. **Print Statements**
-   - Convert all print statements to string responses
-   - Combine multiple outputs into a single response string
+- **Heroku**: Use the provided `Procfile`
+- **AWS Elastic Beanstalk**: Use the provided `Dockerrun.aws.json`
+- **Google Cloud Run**: Use the provided `Dockerfile`
 
-3. **Main Function**
-   - Remove the `if __name__ == "__main__":` block
-   - Convert the main logic into the `run()` function
-   - Ensure all parameters are passed through kwargs 
+## Rate Limits & Usage
+
+- Respects CoinGecko API rate limits
+- OpenAI API usage based on your plan
+- Perplexity API limits apply
+
+## Security Notes
+
+- Always use HTTPS in production
+- Protect your API keys
+- Consider adding API key authentication for your endpoints
+- Monitor usage and costs
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request. 
