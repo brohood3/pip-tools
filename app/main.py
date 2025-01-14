@@ -9,7 +9,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Initialize OpenAI client
-openai_client = OpenAI()
+openai_client = OpenAI(
+    api_key=os.getenv('OPENAI_API_KEY')
+)
 
 app = FastAPI(title="Trading Tools API")
 
