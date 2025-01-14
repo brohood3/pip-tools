@@ -1,9 +1,0 @@
-pandas
-numpy
-ta
-requests
-python-dotenv
-openai
-pyyaml
-fastapi
-uvicorn[standard] 

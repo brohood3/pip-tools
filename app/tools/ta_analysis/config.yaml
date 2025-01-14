@@ -1,0 +1,50 @@
+name: ta_analysis
+description: Analyzes technical indicators and chart patterns for a single trading pair. Only use for price action and technical analysis of one specific token pair.
+version: "1.0"
+use_cases:
+  - Analyzing technical indicators for one trading pair
+  - Checking chart patterns for a specific token
+  - Getting trading signals for a single pair
+example_prompts:
+  - "What do the technicals show for ETH/USD over the next weeks?"
+  - "Is BTC looking bullish or bearish right now?"
+  - "Show me the technical analysis for SOL/USD on the 4h timeframe"
+required_params:
+  prompt: string
+api_keys:
+  taapi: string
+  openai: string
+output_format:
+  text: string  # Formatted technical analysis
+  metadata:
+    symbol: string
+    interval: string
+    indicators:
+      trend:
+        ema: object  # Multiple EMAs (20, 50, 200)
+        supertrend: object  # value and direction
+        adx: number
+        dmi: object  # adx, pdi, mdi
+        psar: number
+      momentum:
+        rsi: number
+        macd: object  # value, signal, histogram
+        stoch: object  # K and D values
+        mfi: number
+        cci: number
+      patterns:
+        doji: number  # 0, 100, or -100
+        engulfing: number  # 0, 100, or -100
+        hammer: number  # 0, 100, or -100
+        shootingstar: number  # 0, 100, or -100
+      volatility:
+        bbands: object  # upper, middle, lower
+        atr: number
+        volume: number
+        vwap: number
+      volume:
+        ad: number  # Chaikin A/D
+        adosc: number  # A/D Oscillator
+        cmf: number  # Money Flow
+        obv: number  # On Balance Volume
+        vosc: number  # Volume Oscillator 

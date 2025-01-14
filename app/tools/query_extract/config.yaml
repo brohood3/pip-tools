@@ -1,0 +1,29 @@
+name: query_extract
+description: Extract and analyze specific information from Dune Analytics queries using natural language questions. Allows querying on-chain data with plain English questions.
+version: "1.0"
+use_cases:
+  - Analyzing specific metrics from Dune query results
+  - Extracting time-series data with date filtering
+  - Getting precise answers from complex query outputs
+example_prompts:
+  - "query 3515965 what is the total volume on 12th of jan?"
+  - "dune query 2608196 show me the number of unique users"
+  - "query id 3515965 what's the average transaction value?"
+required_params:
+  prompt: string  # Natural language question including Dune query ID
+api_keys:
+  dune: string    # Dune Analytics API key
+  openai: string  # OpenAI API key for analysis
+output_format:
+  text: string  # Analyzed answer from the query data
+  metadata:
+    query_id: integer
+    total_row_count: integer
+    returned_row_count: integer
+    column_names: array
+    execution_time: string
+    last_refresh_time: string
+error_messages:
+  - "Could not determine Dune query ID. Please provide a valid query ID."
+  - "Could not fetch results for query {query_id}. Please verify the query exists and has recent results."
+  - "Error extracting information. Please try again." 

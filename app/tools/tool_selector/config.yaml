@@ -1,0 +1,25 @@
+name: tool_selector
+description: Analyzes user requests and selects the most appropriate tool from the available tools in app/tools. Uses natural language processing to understand intent and match to tool capabilities.
+version: "1.0"
+use_cases:
+  - Determining which tool to use for a specific request
+  - Understanding user intent and matching to available capabilities
+  - Providing guidance on required parameters for selected tools
+example_prompts:
+  - "What do the technicals show for ETH/USD over the next weeks?"
+  - "query 3515965 what is the total volume on 12th of jan?"
+  - "analyze the fundamentals of the PEPE token"
+required_params:
+  prompt: string  # Natural language request to analyze
+api_keys:
+  openai: string  # OpenAI API key for intent analysis
+output_format:
+  text: string  # Description of selected tool and reasoning
+  metadata:
+    tool: string  # Selected tool name or "none"
+    confidence: string  # high/medium/low
+    reasoning: string  # Explanation of tool selection
+    required_params: object  # Parameters needed for the selected tool
+error_messages:
+  - "Missing OPENAI_API_KEY environment variable"
+  - "Cannot confidently match this request to available tools" 

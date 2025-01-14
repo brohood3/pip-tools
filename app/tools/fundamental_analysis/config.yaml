@@ -1,0 +1,30 @@
+name: fundamental_analysis
+description: Performs deep research on a single token, blockchain, or protocol's fundamentals. Only use when analyzing one specific project's metrics, team, technology, and market position. Do not use for comparisons or multiple projects.
+version: "1.0"
+use_cases:
+  - Researching a specific token's fundamentals
+  - Checking current status of a single project
+  - Understanding one token's recent developments
+  - Analyzing a single token's health
+example_prompts:
+  - "What's going on with Arbitrum lately?"
+  - "Do a deep dive on the LINK token"
+  - "Analyze the fundamentals of Optimism"
+  - "What's the state of ETH?"
+required_params:
+  prompt: string
+api_keys:
+  openai: string
+  perplexity: string
+output_format:
+  text: string  # Formatted analysis report
+  metadata:
+    token: string
+    analysis:
+      tokenomics: string
+      team: string
+      technology: string
+      market: string
+      risks: string
+    score: number
+    recommendation: string 
