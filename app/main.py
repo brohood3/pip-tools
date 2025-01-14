@@ -8,11 +8,14 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Initialize OpenAI client with just the API key
+# Initialize OpenAI client with minimal configuration
 api_key = os.getenv('OPENAI_API_KEY')
 if not api_key:
     raise ValueError("OPENAI_API_KEY environment variable is not set")
-openai_client = OpenAI(api_key=api_key)
+openai_client = OpenAI(
+    api_key=api_key,
+    http_client=None  # Explicitly disable custom http client
+)
 
 app = FastAPI(title="Trading Tools API")
 
