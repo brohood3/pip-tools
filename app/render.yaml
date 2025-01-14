@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: custom-skills-wip
+    env: docker
+    region: frankfurt
+    rootDir: app
+    branch: main
+    healthCheckPath: /
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: TAAPI_API_KEY
+        sync: false
+      - key: DUNE_API_KEY
+        sync: false
+      - key: COINGECKO_API_KEY
+        sync: false
+      - key: PERPLEXITY_API_KEY
+        sync: false 
