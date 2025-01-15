@@ -11,6 +11,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 from openai import OpenAI
 from fastapi import HTTPException
+import httpx
 
 # Load environment variables
 load_dotenv()

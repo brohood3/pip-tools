@@ -1,4 +1,5 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
 from openai import OpenAI
@@ -14,10 +15,24 @@ if not api_key:
     raise ValueError("OPENAI_API_KEY environment variable is not set")
 openai_client = OpenAI(
     api_key=api_key,
-    http_client=None  # Explicitly disable custom http client
+    http_client=None,  # Explicitly disable custom http client
+    timeout=60.0  # Set OpenAI client timeout to 60 seconds
 )
 
-app = FastAPI(title="Trading Tools API")
+app = FastAPI(
+    title="Trading Tools API",
+    docs_url="/docs",
+    redoc_url="/redoc"
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
 
 class PromptRequest(BaseModel):
     prompt: str
@@ -151,8 +166,12 @@ async def technical_analysis(request: PromptRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/future-predictor")
-async def future_predictor(request: PromptRequest):
+async def future_predictor(request: PromptRequest, response: Response):
     try:
+        # Set a longer timeout for this specific endpoint
+        response.headers["X-Accel-Buffering"] = "no"
+        response.headers["Connection"] = "keep-alive"
+        
         tool = FuturePredictor()
         result = tool.run(request.prompt)
         return {"result": result}
