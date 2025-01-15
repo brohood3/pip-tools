@@ -1,0 +1,69 @@
+name: ta_essential
+description: Essential Technical Analysis Tool using key indicators for cryptocurrency market analysis. Focuses on high-probability trade setups with clear entry/exit points.
+version: "1.0"
+use_cases:
+  - Identifying high-probability trading setups using essential indicators
+  - Analyzing market structure and key price levels
+  - Getting precise entry/exit points with risk management rules
+example_prompts:
+  - "Find trading setups for ETH/USD on the 4h timeframe"
+  - "Analyze BTC/USDT for potential entries with clear stop loss levels"
+  - "Show me high-probability setups for SOL/USD with risk management rules"
+required_params:
+  prompt: string
+api_keys:
+  taapi: string
+  openai: string
+output_format:
+  text: string  # Formatted technical analysis with clear trade setups
+  metadata:
+    symbol: string
+    interval: string
+    indicators:
+      moving_averages:
+        sma:
+          period_20: number
+        ema:
+          period_20: number
+      trend:
+        supertrend:
+          value: number
+          valueAdvice: string
+        adx: number
+        dmi:
+          adx: number
+          pdi: number
+          mdi: number
+      volume_volatility:
+        volume:
+          value: number
+        stddev:
+          value: number
+      momentum:
+        macd:
+          valueMACD: number
+          valueMACDSignal: number
+          valueMACDHist: number
+        rsi:
+          value: number
+      price:
+        bollinger:
+          valueUpperBand: number
+          valueMiddleBand: number
+          valueLowerBand: number
+        fibonacci:
+          value: number
+          trend: string
+          startPrice: number
+          endPrice: number
+          startTimestamp: number
+          endTimestamp: number
+      ichimoku:
+        conversion: number
+        base: number
+        spanA: number
+        spanB: number
+        currentSpanA: number
+        currentSpanB: number
+        laggingSpanA: number
+        laggingSpanB: number 

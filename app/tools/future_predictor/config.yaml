@@ -1,25 +1,58 @@
 name: future_predictor
 description: AI-powered future prediction tool that combines research from multiple sources to generate detailed predictions for cryptocurrency and market-related questions.
-version: 1.0.0
-author: Cursor AI
-requires:
-  - openai
-  - python-dotenv
-
-environment:
-  - OPENAI_API_KEY
-  - PERPLEXITY_API_KEY
-
-parameters:
-  prompt:
-    type: string
-    description: The prediction request or question to analyze
-    required: true
-
-returns:
-  prediction:
-    type: string
-    description: Detailed prediction analysis with multiple scenarios and confidence levels
+version: "1.0"
+use_cases:
+  - Predicting future cryptocurrency prices and market trends
+  - Analyzing potential market developments and adoption scenarios
+  - Forecasting technological developments in the blockchain space
+example_prompts:
+  - "What will be the price of Bitcoin by the end of 2025?"
+  - "Will Ethereum 2.0 successfully transition to full sharding by the end of 2024?"
+  - "What will be the state of DeFi adoption by mid-2025?"
+required_params:
+  prompt: string
+api_keys:
+  openai: string
+  perplexity: string
+output_format:
+  text: string  # Formatted prediction with scenarios and analysis
   metadata:
-    type: object
-    description: Additional context including research findings and timestamp 
+    timestamp: string
+    query: string
+    prediction_horizon: string
+    confidence_level: number  # Scale of 1-10
+    scenarios:
+      optimistic:
+        probability: number
+        description: string
+        key_factors: array
+      base:
+        probability: number
+        description: string
+        key_factors: array
+      pessimistic:
+        probability: number
+        description: string
+        key_factors: array
+    analysis:
+      main_drivers:
+        type: array
+        items:
+          factor: string
+          impact: string
+          confidence: number
+      critical_uncertainties:
+        type: array
+        items:
+          factor: string
+          potential_impact: string
+      supporting_data:
+        historical_precedents: array
+        market_indicators: array
+        expert_opinions: array
+      risk_factors:
+        type: array
+        items:
+          risk: string
+          likelihood: number
+          impact: string 
