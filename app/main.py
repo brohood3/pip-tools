@@ -54,6 +54,15 @@ class TechnicalAnalysis:
     def run(self, prompt: str) -> Dict[str, Any]:
         return self.tool.run(prompt)
 
+class FuturePredictor:
+    def __init__(self):
+        """Initialize with OpenAI client"""
+        from tools.future_predictor.tool import FuturePredictor as FPTool
+        self.tool = FPTool()
+
+    def run(self, prompt: str) -> Dict[str, Any]:
+        return self.tool.run(prompt)
+
 @app.get("/")
 async def root():
     return {"message": "Trading Tools API is running"}
@@ -82,6 +91,11 @@ async def list_tools():
                 "name": "technical-analysis",
                 "description": "Performs technical analysis on trading pairs",
                 "endpoint": "/ta-analysis"
+            },
+            {
+                "name": "future-predictor",
+                "description": "Generates detailed predictions for cryptocurrency and market-related questions",
+                "endpoint": "/future-predictor"
             }
         ]
     }
@@ -117,6 +131,15 @@ async def fundamental_analysis(request: PromptRequest):
 async def technical_analysis(request: PromptRequest):
     try:
         tool = TechnicalAnalysis()
+        result = tool.run(request.prompt)
+        return {"result": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/future-predictor")
+async def future_predictor(request: PromptRequest):
+    try:
+        tool = FuturePredictor()
         result = tool.run(request.prompt)
         return {"result": result}
     except Exception as e:

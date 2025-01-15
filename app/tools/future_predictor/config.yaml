@@ -1,0 +1,25 @@
+name: future_predictor
+description: AI-powered future prediction tool that combines research from multiple sources to generate detailed predictions for cryptocurrency and market-related questions.
+version: 1.0.0
+author: Cursor AI
+requires:
+  - openai
+  - python-dotenv
+
+environment:
+  - OPENAI_API_KEY
+  - PERPLEXITY_API_KEY
+
+parameters:
+  prompt:
+    type: string
+    description: The prediction request or question to analyze
+    required: true
+
+returns:
+  prediction:
+    type: string
+    description: Detailed prediction analysis with multiple scenarios and confidence levels
+  metadata:
+    type: object
+    description: Additional context including research findings and timestamp 
