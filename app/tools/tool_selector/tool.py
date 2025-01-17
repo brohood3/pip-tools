@@ -12,6 +12,7 @@ from typing import Dict, Optional, List, TypedDict, Literal, Union
 from openai import OpenAI
 import re
 from dotenv import load_dotenv
+from datetime import datetime
 
 # --- Type Definitions ---
 class ToolConfig(TypedDict):
@@ -210,22 +211,33 @@ def get_tool_for_prompt(client: OpenAI, prompt: str) -> Union[ToolResult, NoTool
     # Return appropriate response based on confidence
     if tool != 'none' and confidence in ['high', 'medium']:
         result = {
-            'tool': tool,
-            'prompt': prompt,
-            'confidence': confidence,
-            'reasoning': reasoning,
-            'required_params': tools_config['tools'][tool].get('required_params', {})
+            'response': {
+                'tool': tool,
+                'confidence': confidence,
+                'reasoning': reasoning,
+                'required_params': tools_config['tools'][tool].get('required_params', {})
+            },
+            'metadata': {
+                'prompt': prompt,
+                'timestamp': datetime.now().isoformat()
+            }
         }
         if additional_info:
-            result['additional_info'] = additional_info
+            result['response']['additional_info'] = additional_info
         return result
     else:
         capabilities = [f"- {tool_data['description']}" 
                        for name, tool_data in tools_config['tools'].items()
                        if name != 'tool_selector']
         return {
-            'tool': 'none',
-            'message': f"Cannot confidently match this request to available tools. Our tools can help with:\n" + "\n".join(capabilities)
+            'response': {
+                'tool': 'none',
+                'message': f"Cannot confidently match this request to available tools. Our tools can help with:\n" + "\n".join(capabilities)
+            },
+            'metadata': {
+                'prompt': prompt,
+                'timestamp': datetime.now().isoformat()
+            }
         }
 
 # --- Main Execution ---
@@ -257,15 +269,15 @@ def main():
         # Print results
         print("\nRESULTS:")
         print("-" * 50)
-        if result['tool'] != 'none':
-            print(f"Selected tool: {result['tool']}")
-            print(f"Confidence: {result['confidence']}")
-            print(f"Reasoning: {result['reasoning']}")
+        if result['response']['tool'] != 'none':
+            print(f"Selected tool: {result['response']['tool']}")
+            print(f"Confidence: {result['response']['confidence']}")
+            print(f"Reasoning: {result['response']['reasoning']}")
             print("\nRequired parameters:")
-            for param, details in result['required_params'].items():
+            for param, details in result['response']['required_params'].items():
                 print(f"- {param}: {details}")
         else:
-            print(result['message'])
+            print(result['response']['message'])
         
     except Exception as e:
         print(f"An error occurred: {e}")

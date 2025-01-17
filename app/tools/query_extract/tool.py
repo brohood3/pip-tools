@@ -56,10 +56,12 @@ class QueryExtract:
         
         # Return structured response
         return {
-            "query_id": query_id,
-            "question": cleaned_question,
-            "answer": answer,
-            "metadata": results['metadata']
+            "response": answer,
+            "metadata": {
+                "query_id": query_id,
+                "question": cleaned_question,
+                "query_metadata": results['metadata']
+            }
         }
 
     def _get_dune_results(self, query_id: int) -> Optional[Dict[Any, Any]]:

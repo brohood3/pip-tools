@@ -69,7 +69,7 @@ class FuturePredictor:
             }
             
             return {
-                "prediction": prediction,
+                "response": prediction,
                 "metadata": metadata
             }
             

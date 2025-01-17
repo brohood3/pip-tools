@@ -112,7 +112,7 @@ class TechnicalAnalysis:
             }
             
             return {
-                "analysis": analysis,
+                "response": analysis,
                 "metadata": metadata
             }
             

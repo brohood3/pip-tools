@@ -437,7 +437,7 @@ Only provide these two lines, nothing else."""
                 metadata["note"] = "Analysis generated without CoinGecko data"
             
             return {
-                "analysis": analysis,
+                "response": analysis,
                 "metadata": metadata
             }
             
