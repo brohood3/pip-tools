@@ -114,7 +114,7 @@ Please provide your VC firm's analysis covering:
    - Relative valuation metrics"""
 
             completion = self.openai_client.chat.completions.create(
-                model="gpt-4",
+                model="gpt-4o",
                 messages=[
                     {
                         "role": "system",
@@ -298,18 +298,32 @@ RESEARCH FINDINGS:
 3. Market Context:
 {market_context}
 
-Based on this research, provide your investment thesis and recommendations. Focus on:
-- Clear investment stance backed by specific data points from all three analyses
-- Most compelling opportunities and critical risks
-- Actionable entry/exit strategies and position management
-- Key metrics that would change your thesis"""
+Based on this research, provide your investment thesis with clear sections. Structure your response like this:
+
+# Investment Stance
+
+[Main investment thesis backed by specific data points from all three analyses]
+
+# Opportunities and Risks
+
+[Key opportunities and risks analysis]
+
+# Entry/Exit Strategy
+
+[Strategic actionable recommendations]
+
+# Key Metrics
+
+[Important metrics to watch that could change your thesis]
+
+Use clear line breaks between sections and paragraphs. Keep each section focused and concise."""
 
             completion = self.openai_client.chat.completions.create(
-                model="gpt-4",
+                model="gpt-4o",
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are the Chief Investment Officer at a prestigious crypto investment firm. Make clear, opinionated investment recommendations backed by data. Focus on actionable insights rather than summarizing research. Be decisive but support all major claims with evidence."
+                        "content": "You are the Chief Investment Officer at a prestigious crypto investment firm. Format your analysis with clear sections separated by line breaks. Make clear, opinionated investment recommendations backed by data. Be decisive but support all major claims with evidence."
                     },
                     {
                         "role": "user",
