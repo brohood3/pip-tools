@@ -617,7 +617,9 @@ IMPORTANT GUIDELINES:
 - Be clear about assumptions and limitations
 - Highlight timing considerations for setups
 
-Your analysis should be thorough but concise, focusing on actionable insights rather than just describing indicators. Emphasize how different signals interact to form a complete picture."""
+Your analysis should be thorough but concise, focusing on actionable insights rather than just describing indicators. Emphasize how different signals interact to form a complete picture.
+
+IMPORTANT: Start your analysis with a clear heading that includes the trading pair and timeframe."""
 
         try:
             response = self.openai_client.chat.completions.create(

@@ -538,7 +538,9 @@ IMPORTANT GUIDELINES:
 - Consider multiple timeframe alignment
 - Highlight setup expiration conditions
 
-Your analysis should be precise and actionable, focusing on clear trade setups with defined entry, exit, and risk management rules."""
+Your analysis should be precise and actionable, focusing on clear trade setups with defined entry, exit, and risk management rules.
+
+IMPORTANT: Start your analysis with a clear heading that includes the trading pair and timeframe."""
 
         try:
             response = self.openai_client.chat.completions.create(
