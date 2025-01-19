@@ -17,4 +17,4 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
 # Start the application with increased timeout
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--timeout", "300", "--timeout-keep-alive", "300"] 
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--timeout-keep-alive", "300"] 
