@@ -238,65 +238,21 @@ IMPORTANT: Respond with ONLY the raw JSON object. Do not include markdown format
         ]
 
     def find_best_pair(self, token: str, available_symbols: List[str]) -> Optional[str]:
-        """Find the best trading pair for a given token."""
+        """Find the best trading pair for a given token. Only accepts exact matches."""
         try:
             # Clean and standardize token
             token = token.strip().upper()
 
             # Remove /USDT if present
-            token = token.replace("/USDT", "")
-
-            # Common token name mappings
-            token_mappings = {
-                "BITCOIN": "BTC",
-                "ETHEREUM": "ETH",
-                "CARDANO": "ADA",
-                "SOLANA": "SOL",
-                "POLYGON": "MATIC",
-                "POLKADOT": "DOT",
-                "CHAINLINK": "LINK",
-                "AVALANCHE": "AVAX",
-                "DOGECOIN": "DOGE",
-                "RIPPLE": "XRP",
-                "LITECOIN": "LTC",
-                "COSMOS": "ATOM",
-                "BINANCE COIN": "BNB",
-                "BNB COIN": "BNB",
-            }
-
-            # Try to map full name to symbol
-            if token in token_mappings:
-                token = token_mappings[token]
-
-            # First try exact USDT pair match
+            token = token.replace('/USDT', '')
+            
+            # Try exact USDT pair match
             exact_match = f"{token}/USDT"
             if exact_match in available_symbols:
                 print(f"\nFound exact match: {exact_match}")
                 return exact_match
-
-            # Then try case-insensitive match
-            for symbol in available_symbols:
-                base = symbol.split("/")[0]  # Get base token
-                if base.upper() == token:
-                    print(f"\nFound case-insensitive match: {symbol}")
-                    return symbol
-
-            # Finally try partial matches
-            partial_matches = []
-            for symbol in available_symbols:
-                base = symbol.split("/")[0]  # Get base token
-                # Check if token is contained in base or base in token
-                if token in base.upper() or base.upper() in token:
-                    partial_matches.append(symbol)
-
-            if partial_matches:
-                # Prioritize shorter matches as they're likely more accurate
-                partial_matches.sort(key=lambda x: len(x.split("/")[0]))
-                best_match = partial_matches[0]
-                print(f"\nFound partial match: {best_match}")
-                return best_match
-
-            print(f"\nNo matching pair found for token: {token}")
+            
+            print(f"\nNo exact match found for token: {token}")
             return None
 
         except Exception as e:
@@ -661,7 +617,9 @@ IMPORTANT GUIDELINES:
 - Consider multiple timeframe alignment
 - Highlight setup expiration conditions
 
-Your analysis should be precise and actionable, focusing on clear trade setups with defined entry, exit, and risk management rules."""
+Your analysis should be precise and actionable, focusing on clear trade setups with defined entry, exit, and risk management rules.
+
+IMPORTANT: Start your analysis with a clear heading that includes the trading pair and timeframe."""
 
         try:
             response = self.openai_client.chat.completions.create(
