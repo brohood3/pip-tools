@@ -16,37 +16,39 @@ import httpx
 # Load environment variables
 load_dotenv()
 
+
 class ResearchResults(TypedDict):
     """TypedDict defining the structure of research results."""
+
     context: str
     factors: str
     dates: str
     alternatives: str
     existing_predictions: str
 
+
 class FuturePredictor:
     """Future prediction tool using OpenAI and Perplexity APIs."""
-    
+
     def __init__(self):
         """Initialize with API clients and configuration."""
-        self.openai_api_key = os.getenv('OPENAI_API_KEY')
-        self.perplexity_api_key = os.getenv('PERPLEXITY_API_KEY')
-        
+        self.openai_api_key = os.getenv("OPENAI_API_KEY")
+        self.perplexity_api_key = os.getenv("PERPLEXITY_API_KEY")
+
         if not all([self.openai_api_key, self.perplexity_api_key]):
             raise ValueError("Missing required API keys")
-            
+
         self.openai_client = OpenAI(api_key=self.openai_api_key)
         self.perplexity_client = OpenAI(
-            api_key=self.perplexity_api_key,
-            base_url="https://api.perplexity.ai"
+            api_key=self.perplexity_api_key, base_url="https://api.perplexity.ai"
         )
 
     def run(self, prompt: str) -> Dict[str, Any]:
         """Main entry point for the future predictor tool.
-        
+
         Args:
             prompt: User's prediction request
-            
+
         Returns:
             Dict containing prediction results and metadata
         """
@@ -55,24 +57,21 @@ class FuturePredictor:
             research_results = self._gather_research(prompt)
             if not research_results:
                 return {"error": "Failed to gather research data"}
-            
+
             # Generate prediction
             prediction = self._generate_prediction(prompt, research_results)
             if not prediction:
                 return {"error": "Failed to generate prediction"}
-            
+
             # Store all context in metadata
             metadata = {
                 "prompt": prompt,
                 "timestamp": datetime.now().isoformat(),
-                "research_results": research_results
+                "research_results": research_results,
             }
-            
-            return {
-                "response": prediction,
-                "metadata": metadata
-            }
-            
+
+            return {"response": prediction, "metadata": metadata}
+
         except Exception as e:
             return {"error": str(e)}
 
@@ -82,9 +81,12 @@ class FuturePredictor:
             response = self.perplexity_client.chat.completions.create(
                 model="llama-3.1-sonar-large-128k-online",
                 messages=[
-                    {"role": "system", "content": "You are a research assistant focused on providing accurate, well-sourced information. For token price questions, always include current price, recent price action, and market sentiment. Be direct and concise."},
-                    {"role": "user", "content": prompt}
-                ]
+                    {
+                        "role": "system",
+                        "content": "You are a research assistant focused on providing accurate, well-sourced information. For token price questions, always include current price, recent price action, and market sentiment. Be direct and concise.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
             )
             return response.choices[0].message.content
         except Exception as e:
@@ -99,7 +101,7 @@ class FuturePredictor:
                 "factors": self._research_factors(question),
                 "dates": self._research_dates(question),
                 "alternatives": self._research_alternatives(question),
-                "existing_predictions": self._research_existing_predictions(question)
+                "existing_predictions": self._research_existing_predictions(question),
             }
         except Exception as e:
             print(f"Error gathering research: {e}")
@@ -187,7 +189,9 @@ For other predictions:
 - Market consensus"""
         return self._get_research(prompt)
 
-    def _create_prediction_prompt(self, question: str, research: ResearchResults) -> str:
+    def _create_prediction_prompt(
+        self, question: str, research: ResearchResults
+    ) -> str:
         """Create the final prediction prompt."""
         return f"""Based on the following research, provide a detailed prediction for this question. You MUST provide specific predictions with numerical ranges, even if confidence is low.
 
@@ -243,18 +247,28 @@ CRITICAL UNCERTAINTIES:
 - [Key risk factor 2]
 - [Key risk factor 3]"""
 
-    def _generate_prediction(self, question: str, research: ResearchResults) -> Optional[str]:
+    def _generate_prediction(
+        self, question: str, research: ResearchResults
+    ) -> Optional[str]:
         """Generate the final prediction using OpenAI."""
         try:
             prompt = self._create_prediction_prompt(question, research)
             response = self.openai_client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
-                    {"role": "system", "content": "You are a precise analytical engine specializing in future predictions, particularly for token prices. Always provide specific numerical predictions with ranges, even with low confidence. Never avoid making a prediction - if uncertain, provide a wider range and explain the uncertainties."},
-                    {"role": "user", "content": prompt}
-                ]
+                    {
+                        "role": "system",
+                        "content": "You are a precise analytical engine specializing in future predictions, particularly for token prices. Always provide specific numerical predictions with ranges, even with low confidence. Never avoid making a prediction - if uncertain, provide a wider range and explain the uncertainties.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
             )
             return response.choices[0].message.content
         except Exception as e:
             print(f"Error generating prediction: {e}")
-            return None 
+            return None
+
+
+# added the following to have uniformity in the way we call tools
+def run(prompt: str) -> Dict[str, Any]:
+    return FuturePredictor().run(prompt)
