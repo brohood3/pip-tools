@@ -4,10 +4,10 @@ services:
     env: docker
     region: frankfurt
     rootDir: .
-    dockerfilePath: ./deployment/Dockerfile
+    dockerfilePath: ./deployment/Dockerfile.render
     branch: main
     healthCheckPath: /
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT --timeout-keep-alive 300
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --timeout-keep-alive 300
     envVars:
       - key: OPENAI_API_KEY
         sync: false
