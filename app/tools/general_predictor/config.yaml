@@ -1,14 +1,15 @@
-name: future_predictor
-description: AI-powered future prediction tool that combines research from multiple sources to generate detailed predictions for cryptocurrency and market-related questions.
+name: general_predictor
+description: AI-powered prediction tool that combines research from multiple sources to generate detailed predictions for market-related questions, excluding price predictions.
 version: "1.0"
 use_cases:
-  - Predicting future cryptocurrency prices and market trends
   - Analyzing potential market developments and adoption scenarios
   - Forecasting technological developments in the blockchain space
+  - Predicting industry trends and regulatory changes
+  - Assessing future adoption rates and use cases
 example_prompts:
-  - "What will be the price of Bitcoin by the end of 2025?"
   - "Will Ethereum 2.0 successfully transition to full sharding by the end of 2024?"
   - "What will be the state of DeFi adoption by mid-2025?"
+  - "How will regulatory frameworks for cryptocurrencies evolve in the next 2 years?"
 required_params:
   prompt: string
 api_keys:
