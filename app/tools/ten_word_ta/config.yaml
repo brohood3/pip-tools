@@ -1,0 +1,52 @@
+name: ten_word_ta
+description: Generates a concise ten-word technical analysis with price targets based on key indicators. Perfect for quick market insights and directional bias.
+version: "1.0"
+use_cases:
+  - Getting quick market direction and price targets
+  - Understanding key technical factors in ten words
+  - Rapid technical analysis for trading decisions
+example_prompts:
+  - "Give me a ten word analysis for Bitcoin"
+  - "Quick TA for ETH on 4h timeframe"
+  - "Ten word analysis for SOL"
+required_params:
+  prompt: string
+api_keys:
+  taapi: string
+  openai: string
+output_format:
+  text: string  # Ten word technical analysis with price target
+  metadata:
+    prompt: string
+    token: string
+    pair: string
+    interval: string
+    timestamp: string
+    indicators:
+      price:
+        value: number
+      supertrend:
+        value: number
+        valueAdvice: string
+      fibonacciretracement:
+        value: number
+        trend: string
+      moving_averages:
+        sma:
+          period_20: number
+        ema:
+          period_20: number
+      momentum:
+        rsi:
+          value: number
+        macd:
+          valueMACD: number
+          valueMACDSignal: number
+          valueMACDHist: number
+      volatility:
+        bbands:
+          valueUpperBand: number
+          valueMiddleBand: number
+          valueLowerBand: number
+      volume:
+        value: number 
