@@ -58,11 +58,12 @@ class TechnicalAnalysis:
         self.openai_client = OpenAI(api_key=self.openai_api_key)
         self.taapi_base_url = "https://api.taapi.io"
 
-    def run(self, prompt: str) -> Dict[str, Any]:
+    def run(self, prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
         """Main entry point for the technical analysis tool.
 
         Args:
             prompt: User's analysis request
+            system_prompt: Optional custom system prompt for the analysis
 
         Returns:
             Dict containing analysis results and metadata
@@ -96,7 +97,7 @@ class TechnicalAnalysis:
                 }
 
             # Generate analysis
-            analysis = self.generate_analysis(indicators, pair, interval, prompt)
+            analysis = self.generate_analysis(indicators, pair, interval, prompt, system_prompt)
 
             # Store all context in metadata
             metadata = {
@@ -471,6 +472,7 @@ IMPORTANT: Respond with ONLY the raw JSON object. Do not include markdown format
         symbol: str,
         interval: str,
         original_prompt: str,
+        system_prompt: Optional[str] = None,
     ) -> str:
         """Generate an opinionated technical analysis report using GPT-4."""
         # Map intervals to human-readable time horizons
@@ -665,10 +667,7 @@ IMPORTANT: Respond with ONLY the raw JSON object. Do not include markdown format
             )
 
         # Build the context for GPT-4
-        context = f"""You are a seasoned technical analyst specializing in {time_horizon} cryptocurrency analysis.
-Your analysis is known for being clear, opinionated, and actionable.
-
-ANALYSIS REQUEST:
+        context = f"""ANALYSIS REQUEST:
 Original Query: "{original_prompt}"
 Asset: {symbol}
 Timeframe: {interval} candles
@@ -715,32 +714,37 @@ IMPORTANT GUIDELINES:
 - Be clear about assumptions and limitations
 - Highlight timing considerations for setups
 
-Your analysis should be thorough but concise, focusing on actionable insights rather than just describing indicators. Emphasize how different signals interact to form a complete picture.
+
 
 IMPORTANT: Start your analysis with a clear heading that includes the trading pair and timeframe."""
 
         try:
-            response = self.openai_client.chat.completions.create(
+            completion = self.openai_client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
                     {
                         "role": "system",
-                        "content": f"You are a professional technical analyst specializing in {time_horizon} cryptocurrency trading. Your analysis combines multiple timeframes and indicators to form actionable insights, always considering risk management and market context.",
+                        "content": system_prompt if system_prompt else f"""You are a seasoned technical analyst specializing in {time_horizon} cryptocurrency analysis.
+Your analysis is known for being clear, opinionated, and actionable. You always:
+- Provide specific price levels and conditions
+- Back up your bias with multiple confirming signals
+- Explain which signals you prioritize and why
+- Give clear entry, stop, and target levels
+- Discuss both supporting and conflicting signals
+- Adjust confidence based on data quality""",
                     },
                     {"role": "user", "content": context},
                 ],
                 temperature=0.7,
-                max_tokens=2000,  # Increased for more detailed analysis
             )
 
-            return response.choices[0].message.content
+            return completion.choices[0].message.content
 
         except Exception as e:
-            raise HTTPException(
-                status_code=500, detail=f"Error generating analysis: {str(e)}"
-            )
+            print(f"Error generating analysis: {e}")
+            return None
 
 
 # added the following to have uniformity in the way we call tools
-def run(prompt: str) -> Dict[str, Any]:
-    return TechnicalAnalysis().run(prompt)
+def run(prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
+    return TechnicalAnalysis().run(prompt, system_prompt)

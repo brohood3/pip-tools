@@ -305,6 +305,7 @@ Please provide your strategic market assessment covering:
         project_research: str,
         market_context: str,
         original_prompt: str,
+        system_prompt: Optional[str] = None,
     ) -> str:
         """Generate comprehensive investment report combining all analyses"""
         try:
@@ -365,7 +366,7 @@ Use clear line breaks between sections and paragraphs. Keep each section focused
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are the Chief Investment Officer at a prestigious crypto investment firm. Format your analysis with clear sections separated by line breaks. Make clear, opinionated investment recommendations backed by data. Be decisive but support all major claims with evidence.",
+                        "content": system_prompt if system_prompt else "You are the Chief Investment Officer at a prestigious crypto investment firm. Format your analysis with clear sections separated by line breaks. Make clear, opinionated investment recommendations backed by data. Be decisive but support all major claims with evidence.",
                     },
                     {"role": "user", "content": prompt},
                 ],
@@ -425,7 +426,7 @@ Only provide these two lines, nothing else."""
             print(f"Error identifying CoinGecko ID: {e}")
             return None
 
-    def run(self, prompt: str) -> Dict[str, Any]:
+    def run(self, prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
         """Run fundamental analysis and return structured response"""
         try:
             # Try to get token ID and details from CoinGecko
@@ -451,6 +452,7 @@ Only provide these two lines, nothing else."""
                 project_research,
                 market_context,
                 prompt,
+                system_prompt,
             )
 
             # Store all context in metadata
@@ -496,5 +498,5 @@ Only provide these two lines, nothing else."""
 
 
 # added the following to have uniformity in the way we call tools
-def run(prompt: str) -> Dict[str, Any]:
-    return FundamentalAnalysis().run(prompt)
+def run(prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
+    return FundamentalAnalysis().run(prompt, system_prompt)

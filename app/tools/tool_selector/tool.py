@@ -110,7 +110,7 @@ Provide your analysis."""
 
 
 # --- Tool Selection ---
-def select_tool(client: OpenAI, analysis: str, tools_config: ToolsConfig) -> str:
+def select_tool(client: OpenAI, analysis: str, tools_config: ToolsConfig, system_prompt: Optional[str] = None) -> str:
     """
     Second stage: Select the appropriate tool based on the analysis.
 
@@ -118,6 +118,7 @@ def select_tool(client: OpenAI, analysis: str, tools_config: ToolsConfig) -> str
         client: OpenAI client instance
         analysis: Intent analysis from first stage
         tools_config: Configuration of all available tools
+        system_prompt: Optional custom system prompt for tool selection
 
     Returns:
         Structured response with tool selection and confidence
@@ -167,7 +168,7 @@ ADDITIONAL_INFO: [any notes about multiple tokens or tools that might be needed]
         messages=[
             {
                 "role": "system",
-                "content": "You are a helpful assistant selecting the appropriate tool. Always use the exact tool name provided. Be conservative with confidence levels when requests are ambiguous or require multiple tools/tokens.",
+                "content": system_prompt if system_prompt else "You are a helpful assistant selecting the appropriate tool. Always use the exact tool name provided. Be conservative with confidence levels when requests are ambiguous or require multiple tools/tokens.",
             },
             {"role": "user", "content": selection_prompt},
         ],
@@ -211,13 +212,14 @@ def parse_tool_selection(
 
 
 # --- Main Logic ---
-def get_tool_for_prompt(client: OpenAI, prompt: str) -> Union[ToolResult, NoToolResult]:
+def get_tool_for_prompt(client: OpenAI, prompt: str, system_prompt: Optional[str] = None) -> Union[ToolResult, NoToolResult]:
     """
     Main function to determine which tool to use for a given prompt.
 
     Args:
         client: OpenAI client instance
         prompt: User's original request
+        system_prompt: Optional custom system prompt for tool selection
 
     Returns:
         Dictionary containing either:
@@ -233,7 +235,7 @@ def get_tool_for_prompt(client: OpenAI, prompt: str) -> Union[ToolResult, NoTool
     print(intent_analysis)
 
     # Stage 2: Select tool
-    tool_selection = select_tool(client, intent_analysis, tools_config)
+    tool_selection = select_tool(client, intent_analysis, tools_config, system_prompt)
     print("\nTOOL SELECTION:")
     print("-" * 50)
     print(tool_selection)
@@ -324,5 +326,5 @@ openai_client = OpenAI()
 
 
 # added the following to have uniformity in the way we call tools
-def run(prompt: str) -> Dict[str, Any]:
-    return get_tool_for_prompt(openai_client, prompt)
+def run(prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
+    return get_tool_for_prompt(openai_client, prompt, system_prompt)

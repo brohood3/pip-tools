@@ -71,16 +71,18 @@ class TechnicalAnalysis:
         self.openai_client = OpenAI(api_key=self.openai_api_key)
         self.taapi_base_url = "https://api.taapi.io"
 
-    def run(self, prompt: str) -> Dict[str, Any]:
+    def run(self, prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
         """Main entry point for the technical analysis tool.
 
         Args:
             prompt: User's analysis request
+            system_prompt: Optional system prompt to override default behavior
 
         Returns:
             Dict containing analysis results and metadata
         """
         try:
+            print(f"\nReceived system prompt in run: {system_prompt}")  # Debug log
             # Extract token and interval from prompt
             token, interval = self.parse_prompt_with_llm(prompt)
             if not token:
@@ -109,7 +111,7 @@ class TechnicalAnalysis:
                 }
 
             # Generate analysis
-            analysis = self.generate_analysis(indicators, pair, interval, prompt)
+            analysis = self.generate_analysis(indicators, pair, interval, prompt, system_prompt)
 
             # Store all context in metadata
             metadata = {
@@ -413,8 +415,10 @@ IMPORTANT: Respond with ONLY the raw JSON object. Do not include markdown format
         symbol: str,
         interval: str,
         original_prompt: str,
+        system_prompt: Optional[str] = None,
     ) -> str:
         """Generate an opinionated technical analysis report using GPT-4."""
+        print(f"\nReceived system prompt in generate_analysis: {system_prompt}")  # Debug log
         # Map intervals to human-readable time horizons
         interval_horizons = {
             "1m": "very short-term (minutes to hours)",
@@ -564,8 +568,7 @@ IMPORTANT: Respond with ONLY the raw JSON object. Do not include markdown format
                 )
 
         # Build the context for GPT-4
-        context = f"""You are a professional technical trader specializing in cryptocurrency markets.
-Your analysis focuses on essential indicators to identify high-probability trading setups.
+        context = f"""Analyze the following market data and provide detailed trading insights.
 
 ANALYSIS REQUEST:
 Original Query: "{original_prompt}"
@@ -579,47 +582,37 @@ TECHNICAL INDICATORS:
 
 {chr(10).join(indicator_sections)}
 
-ANALYSIS REQUIREMENTS:
+REQUIRED SECTIONS:
 
 1. MARKET CONTEXT (20%)
-- Current market phase (ranging/trending)
-- Volume profile analysis
-- Key support/resistance zones
-- Market structure (Higher Highs/Lower Lows)
+- Current market phase
+- Volume analysis
+- Key levels
+- Market structure
 
 2. TRADE SETUP (35%)
-- Primary trade direction
-- Entry trigger conditions
-- Stop loss placement
+- Trade direction
+- Entry conditions
+- Stop loss
 - Take profit levels
-- Position sizing recommendation
-- Risk:Reward calculation
+- Position sizing
+- Risk:Reward
 
 3. INDICATOR SIGNALS (25%)
-- Trend indicator alignment
-- Momentum confirmation
-- Price action patterns
-- Volume confirmation
-- Divergence analysis
+- Trend alignment
+- Momentum status
+- Price patterns
+- Volume analysis
+- Divergence check
 
 4. EXECUTION PLAN (20%)
-- Entry order types and placement
-- Stop loss management rules
-- Take profit strategy (partial/full exits)
-- Position management rules
-- Setup invalidation criteria
+- Entry orders
+- Stop management
+- Take profit strategy
+- Position management
+- Invalidation criteria
 
-IMPORTANT GUIDELINES:
-- Focus on {time_horizon} trading opportunities
-- Prioritize high-probability setups
-- Use specific price levels for entries/exits
-- Emphasize risk management rules
-- Consider multiple timeframe alignment
-- Highlight setup expiration conditions
-
-Your analysis should be precise and actionable, focusing on clear trade setups with defined entry, exit, and risk management rules.
-
-IMPORTANT: Start your analysis with a clear heading that includes the trading pair and timeframe."""
+Your analysis should be precise and actionable. Include specific price levels and clear rules."""
 
         try:
             response = self.openai_client.chat.completions.create(
@@ -627,7 +620,7 @@ IMPORTANT: Start your analysis with a clear heading that includes the trading pa
                 messages=[
                     {
                         "role": "system",
-                        "content": f"You are a technical trader focusing on essential indicators and clear trade setups. Your analysis emphasizes precise entry/exit levels, risk management, and {time_horizon} trading opportunities. Use direct, actionable language.",
+                        "content": system_prompt or f"You are a technical trader focusing on essential indicators and clear trade setups. Your analysis emphasizes precise entry/exit levels, risk management, and {time_horizon} trading opportunities. Use direct, actionable language.",
                     },
                     {"role": "user", "content": context},
                 ],
@@ -644,5 +637,5 @@ IMPORTANT: Start your analysis with a clear heading that includes the trading pa
 
 
 # added the following to have uniformity in the way we call tools
-def run(prompt: str) -> Dict[str, Any]:
-    return TechnicalAnalysis().run(prompt)
+def run(prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
+    return TechnicalAnalysis().run(prompt, system_prompt)

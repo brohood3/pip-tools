@@ -43,11 +43,12 @@ class PricePredictor:
             api_key=self.perplexity_api_key, base_url="https://api.perplexity.ai"
         )
 
-    def run(self, prompt: str) -> Dict[str, Any]:
+    def run(self, prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
         """Main entry point for the price predictor tool.
 
         Args:
             prompt: User's prediction request
+            system_prompt: Optional custom system prompt for the final prediction
 
         Returns:
             Dict containing prediction results and metadata
@@ -59,7 +60,7 @@ class PricePredictor:
                 return {"error": "Failed to gather research data"}
 
             # Generate prediction
-            prediction = self._generate_prediction(prompt, research_results)
+            prediction = self._generate_prediction(prompt, research_results, system_prompt)
             if not prediction:
                 return {"error": "Failed to generate prediction"}
 
@@ -261,37 +262,41 @@ KEY PRICE LEVELS TO WATCH:
 - Volume zones: $[level 1], $[level 2]"""
 
     def _generate_prediction(
-        self, question: str, research: ResearchResults
+        self, question: str, research: ResearchResults, system_prompt: Optional[str] = None
     ) -> Optional[str]:
         """Generate the final prediction using OpenAI."""
         try:
             prompt = self._create_prediction_prompt(question, research)
-            response = self.openai_client.chat.completions.create(
+
+            completion = self.openai_client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
                     {
                         "role": "system",
-                        "content": """You are a precise analytical engine specializing in price predictions. Your goal is to make decisive predictions with clear, differentiated probabilities.
+                        "content": system_prompt if system_prompt else """You are a precise analytical engine specializing in price predictions. Your goal is to make decisive predictions with clear price targets and differentiated probabilities.
 
 PROBABILITY GUIDELINES:
 - Never use 50% as it indicates complete uncertainty
 - Base case should be your highest probability scenario (35-65%)
-- Bull and bear cases should have differentiated probabilities that reflect your analysis
+- Alternative scenarios should have differentiated probabilities that reflect your analysis
 - Total probabilities must sum to 100%
-- Use narrower probability ranges (e.g., 42% not 40-45%)
+- Use specific probability numbers (e.g., 42% not 40-45%)
 - Back up probability assignments with specific factors from your research
 
-Always provide specific numerical predictions with ranges. If uncertain, explain the uncertainties but still provide your best assessment based on the available data.""",
+Always provide specific price targets with clear ranges. If uncertain, explain the uncertainties but still provide your best price targets based on the available data and research.""",
                     },
                     {"role": "user", "content": prompt},
                 ],
+                temperature=0.7,
             )
-            return response.choices[0].message.content
+
+            return completion.choices[0].message.content
+
         except Exception as e:
             print(f"Error generating prediction: {e}")
             return None
 
 
 # added the following to have uniformity in the way we call tools
-def run(prompt: str) -> Dict[str, Any]:
-    return PricePredictor().run(prompt)
+def run(prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
+    return PricePredictor().run(prompt, system_prompt)

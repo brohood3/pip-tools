@@ -34,11 +34,12 @@ class TenWordTA:
         self.openai_client = OpenAI(api_key=self.openai_api_key)
         self.taapi_base_url = "https://api.taapi.io"
 
-    def run(self, prompt: str) -> Dict[str, Any]:
+    def run(self, prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
         """Main entry point for the ten word TA tool.
 
         Args:
             prompt: User's analysis request
+            system_prompt: Optional system prompt to override default behavior
 
         Returns:
             Dict containing ten word analysis and metadata
@@ -72,7 +73,7 @@ class TenWordTA:
                 }
 
             # Generate ten word analysis
-            analysis = self._generate_ten_word_ta(indicators, pair, interval)
+            analysis = self._generate_ten_word_ta(indicators, pair, interval, system_prompt)
 
             # Store all context in metadata
             metadata = {
@@ -296,7 +297,7 @@ IMPORTANT: Respond with ONLY the raw JSON object. Do not include markdown format
             return None
 
     def _generate_ten_word_ta(
-        self, indicators: Dict[str, Any], pair: str, interval: str
+        self, indicators: Dict[str, Any], pair: str, interval: str, system_prompt: Optional[str] = None
     ) -> str:
         """Generate ten word technical analysis with price target."""
         try:
@@ -327,7 +328,7 @@ IMPORTANT: Count words carefully. Hyphenated terms count as one word. Numbers co
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a precise technical analyst who provides exactly ten-word analyses. You always include price targets based on technical indicators.",
+                        "content": system_prompt or "You are a precise technical analyst who provides exactly ten-word analyses. You always include price targets based on technical indicators.",
                     },
                     {"role": "user", "content": prompt},
                 ],
@@ -342,5 +343,5 @@ IMPORTANT: Count words carefully. Hyphenated terms count as one word. Numbers co
 
 
 # added the following to have uniformity in the way we call tools
-def run(prompt: str) -> Dict[str, Any]:
-    return TenWordTA().run(prompt) 
+def run(prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
+    return TenWordTA().run(prompt, system_prompt) 

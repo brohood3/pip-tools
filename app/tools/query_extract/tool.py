@@ -39,8 +39,16 @@ class QueryExtract:
         self.openai_client = OpenAI()
         self.dune_client = DuneClient(self.dune_api_key)
 
-    def run(self, prompt: str) -> Dict[str, Any]:
-        """Main entry point for the tool"""
+    def run(self, prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
+        """Main entry point for the tool
+        
+        Args:
+            prompt: User's query extraction request
+            system_prompt: Optional custom system prompt for the analysis
+            
+        Returns:
+            Dict containing extracted information and metadata
+        """
         # Extract query ID and question
         query_id, cleaned_question = self._extract_query_details(prompt)
         if not query_id:
@@ -58,7 +66,7 @@ class QueryExtract:
             )
 
         # Extract specific information
-        answer = self._extract_specific_info(results, prompt)
+        answer = self._extract_specific_info(results, prompt, system_prompt)
         if not answer:
             raise HTTPException(
                 status_code=500,
@@ -118,7 +126,7 @@ class QueryExtract:
                 status_code=500, detail=f"Error fetching Dune results: {str(e)}"
             )
 
-    def _extract_specific_info(self, data: Dict[Any, Any], question: str) -> str:
+    def _extract_specific_info(self, data: Dict[Any, Any], question: str, system_prompt: Optional[str] = None) -> str:
         """Extract specific information from query results based on the question"""
         try:
             result_data = data.get("result", [])
@@ -159,7 +167,7 @@ Please provide:
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a precise data analyst who extracts specific information from query results. Provide direct, focused answers using only the data available.",
+                        "content": system_prompt if system_prompt else "You are a precise data analyst who extracts specific information from query results. Provide direct, focused answers using only the data available.",
                     },
                     {"role": "user", "content": prompt},
                 ],
@@ -214,5 +222,5 @@ Please provide:
 
 
 # added the following to have uniformity in the way we call tools
-def run(prompt: str) -> Dict[str, Any]:
-    return QueryExtract().run(prompt)
+def run(prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
+    return QueryExtract().run(prompt, system_prompt)

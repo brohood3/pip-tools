@@ -43,11 +43,12 @@ class GeneralPredictor:
             api_key=self.perplexity_api_key, base_url="https://api.perplexity.ai"
         )
 
-    def run(self, prompt: str) -> Dict[str, Any]:
+    def run(self, prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
         """Main entry point for the general predictor tool.
 
         Args:
             prompt: User's prediction request
+            system_prompt: Optional custom system prompt for the final prediction
 
         Returns:
             Dict containing prediction results and metadata
@@ -59,7 +60,7 @@ class GeneralPredictor:
                 return {"error": "Failed to gather research data"}
 
             # Generate prediction
-            prediction = self._generate_prediction(prompt, research_results)
+            prediction = self._generate_prediction(prompt, research_results, system_prompt)
             if not prediction:
                 return {"error": "Failed to generate prediction"}
 
@@ -184,6 +185,14 @@ Gather:
         """Create the final prediction prompt."""
         return f"""Based on the following research, provide a detailed prediction for this question. You MUST provide specific predictions with clear outcomes and probabilities.
 
+PROBABILITY GUIDELINES:
+- Never use 50% as it indicates complete uncertainty
+- Base case should be your highest probability scenario (35-65%)
+- Alternative scenarios should have differentiated probabilities that reflect your analysis
+- Total probabilities must sum to 100%
+- Use specific probability numbers (e.g., 42% not 40-45%)
+- Back up probability assignments with specific factors from your research
+
 QUESTION: {question}
 
 RESEARCH FINDINGS:
@@ -245,37 +254,31 @@ MONITORING METRICS:
 - [Key metric 3 to watch]"""
 
     def _generate_prediction(
-        self, question: str, research: ResearchResults
+        self, question: str, research: ResearchResults, system_prompt: Optional[str] = None
     ) -> Optional[str]:
         """Generate the final prediction using OpenAI."""
         try:
             prompt = self._create_prediction_prompt(question, research)
-            response = self.openai_client.chat.completions.create(
+
+            completion = self.openai_client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
                     {
                         "role": "system",
-                        "content": """You are a precise analytical engine specializing in future predictions. Your goal is to make decisive predictions with clear, differentiated probabilities.
-
-PROBABILITY GUIDELINES:
-- Never use 50% as it indicates complete uncertainty
-- Base case should be your highest probability scenario (35-65%)
-- Alternative scenarios should have differentiated probabilities that reflect your analysis
-- Total probabilities must sum to 100%
-- Use specific probability numbers (e.g., 42% not 40-45%)
-- Back up probability assignments with specific factors from your research
-
-Always provide specific predictions with clear outcomes. If uncertain, explain the uncertainties but still provide your best assessment based on the available data and research.""",
+                        "content": system_prompt if system_prompt else "You are a precise analytical engine specializing in future predictions. Your goal is to make decisive predictions with clear outcomes. If uncertain, explain the uncertainties but still provide your best assessment based on the available data and research.",
                     },
                     {"role": "user", "content": prompt},
                 ],
+                temperature=0.7,
             )
-            return response.choices[0].message.content
+
+            return completion.choices[0].message.content
+
         except Exception as e:
             print(f"Error generating prediction: {e}")
             return None
 
 
 # added the following to have uniformity in the way we call tools
-def run(prompt: str) -> Dict[str, Any]:
-    return GeneralPredictor().run(prompt) 
+def run(prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
+    return GeneralPredictor().run(prompt, system_prompt) 
