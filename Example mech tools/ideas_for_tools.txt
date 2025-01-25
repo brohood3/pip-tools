@@ -5,3 +5,4 @@ Olas educational thread: Uses agentscan to write a thread on Olas
 Better prediction tool: Less restricitve prediction tool
 Wallet tracker: summmarizes past trades of a wallet
 Token sniffer: gives a report on the security of a token
+Messari news api

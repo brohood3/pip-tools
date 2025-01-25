@@ -433,19 +433,28 @@ Only provide these two lines, nothing else."""
             token_id = self.get_coingecko_id_from_prompt(prompt)
             token_details = None
             if token_id:
-                token_details = self.get_token_details(token_id)
+                try:
+                    token_details = self.get_token_details(token_id)
+                except Exception as e:
+                    token_details = None
 
             # Generate analyses (with or without token details)
-            tokenomics_analysis = self.get_investment_analysis(token_details, prompt)
-            project_research = self.get_project_research(token_details, prompt)
-            market_context = self.get_market_context_analysis(token_details, prompt)
+            try:
+                tokenomics_analysis = self.get_investment_analysis(token_details, prompt)
+            except Exception:
+                tokenomics_analysis = "Tokenomics analysis unavailable due to incomplete market data."
 
-            if not all([tokenomics_analysis, project_research, market_context]):
-                return {
-                    "error": "Error generating complete analysis. Please try again."
-                }
+            try:
+                project_research = self.get_project_research(token_details, prompt)
+            except Exception:
+                project_research = "Project research unavailable due to incomplete data."
 
-            # Generate final report
+            try:
+                market_context = self.get_market_context_analysis(token_details, prompt)
+            except Exception:
+                market_context = "Market context analysis unavailable due to incomplete data."
+
+            # Generate final report even if some analyses failed
             analysis = self.generate_investment_report(
                 token_details,
                 tokenomics_analysis,
@@ -466,30 +475,13 @@ Only provide these two lines, nothing else."""
                 },
             }
 
-            # Add token details to metadata if available
             if token_details:
-                metadata.update(
-                    {
-                        "token_details": token_details,
-                        "token_id": token_id,
-                        "metrics": {
-                            "market_cap": token_details["market_cap"],
-                            "market_cap_fdv_ratio": token_details[
-                                "market_cap_fdv_ratio"
-                            ],
-                            "price_change_24h": token_details["price_change_24h"],
-                            "price_change_14d": token_details["price_change_14d"],
-                            "twitter_followers": token_details["twitter_followers"],
-                        },
-                        "chain_info": {
-                            "chain": token_details["chain"],
-                            "contract": token_details["contract_address"],
-                        },
-                        "links": token_details["links"],
-                    }
-                )
+                metadata.update({
+                    "token_details": token_details,
+                    "token_id": token_id,
+                })
             else:
-                metadata["note"] = "Analysis generated without CoinGecko data"
+                metadata["note"] = "Analysis generated with partial or no CoinGecko data"
 
             return {"response": analysis, "metadata": metadata}
 
