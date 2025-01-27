@@ -1,15 +1,18 @@
 name: general_predictor
-description: AI-powered prediction tool that combines research from multiple sources to generate detailed predictions for market-related questions, excluding price predictions.
+description: Advanced prediction tool that analyzes complex scenarios across politics, economics, technology, and society. Combines multiple research sources to generate detailed probabilistic forecasts with scenario analysis.
 version: "1.0"
 use_cases:
-  - Analyzing potential market developments and adoption scenarios
-  - Forecasting technological developments in the blockchain space
-  - Predicting industry trends and regulatory changes
-  - Assessing future adoption rates and use cases
+  - Predicting political outcomes and policy changes
+  - Forecasting business and economic developments
+  - Analyzing social and cultural trends
+  - Assessing technological advancements and adoption
+  - Evaluating geopolitical scenarios and outcomes
 example_prompts:
-  - "Will Ethereum 2.0 successfully transition to full sharding by the end of 2024?"
-  - "What will be the state of DeFi adoption by mid-2025?"
-  - "How will regulatory frameworks for cryptocurrencies evolve in the next 2 years?"
+  - "Who will win the 2024 US presidential election?"
+  - "Which tech companies are most likely to face antitrust action in 2024?"
+  - "What will be the next major AI breakthrough?"
+  - "Who will Trump choose as his VP candidate?"
+  - "Which country will be the next to adopt AI regulations?"
 required_params:
   prompt: string
 api_keys:
@@ -49,7 +52,7 @@ output_format:
           potential_impact: string
       supporting_data:
         historical_precedents: array
-        market_indicators: array
+        current_indicators: array
         expert_opinions: array
       risk_factors:
         type: array
