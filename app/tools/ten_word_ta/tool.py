@@ -48,29 +48,33 @@ class TenWordTA:
             # Extract token and interval from prompt
             token, interval = self.parse_prompt_with_llm(prompt)
             if not token:
-                return {
-                    "error": "Could not determine which token to analyze. Please specify a token."
-                }
+                raise HTTPException(
+                    status_code=400,
+                    detail="Could not determine which token to analyze. Please specify a token."
+                )
 
             # Get available symbols and find best pair
             available_symbols = self.get_available_symbols()
             if not available_symbols:
-                return {
-                    "error": "Could not fetch available trading pairs. Please try again later."
-                }
+                raise HTTPException(
+                    status_code=500,
+                    detail="Could not fetch available trading pairs. Please try again later."
+                )
 
             pair = self.find_best_pair(token, available_symbols)
             if not pair:
-                return {
-                    "error": f"No trading pair found for {token}. Please verify the token symbol and try again."
-                }
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"No trading pair found for {token}. Please verify the token symbol and try again."
+                )
 
             # Fetch indicators
             indicators = self._fetch_indicators(pair, interval=interval)
             if not indicators:
-                return {
-                    "error": f"Insufficient data for {pair} on {interval} timeframe."
-                }
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Insufficient data for {pair} on {interval} timeframe."
+                )
 
             # Generate ten word analysis
             analysis = self._generate_ten_word_ta(indicators, pair, interval, system_prompt)
@@ -87,8 +91,13 @@ class TenWordTA:
 
             return {"response": analysis, "metadata": metadata}
 
+        except HTTPException:
+            raise  # Re-raise HTTP exceptions
         except Exception as e:
-            return {"error": str(e)}
+            raise HTTPException(
+                status_code=500,
+                detail=str(e)
+            )
 
     def parse_prompt_with_llm(self, prompt: str) -> tuple[Optional[str], str]:
         """Extract token and timeframe from prompt using GPT."""
