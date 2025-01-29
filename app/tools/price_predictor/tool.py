@@ -43,6 +43,15 @@ class PricePredictor:
             api_key=self.perplexity_api_key, base_url="https://api.perplexity.ai"
         )
 
+    def _get_time_context(self) -> str:
+        """Generate current time context for research queries."""
+        now = datetime.now()
+        return f"""Current time context:
+- Current date: {now.strftime('%Y-%m-%d')}
+- Current year: {now.year}
+- Current month: {now.strftime('%B')}
+Please ensure all analysis and predictions are made with this current time context in mind."""
+
     def run(self, prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
         """Main entry point for the price predictor tool.
 
@@ -79,14 +88,19 @@ class PricePredictor:
     def _get_research(self, prompt: str) -> str:
         """Make a research query using Perplexity."""
         try:
+            time_context = self._get_time_context()
             response = self.perplexity_client.chat.completions.create(
                 model="llama-3.1-sonar-large-128k-online",
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a research assistant focused on providing accurate, well-sourced information. For token price questions, always include current price, recent price action, and market sentiment. Be direct and concise.",
+                        "content": f"""You are a research assistant focused on providing accurate, well-sourced information. For token price questions, always include current price, recent price action, and market sentiment. Be direct and concise.
+
+{time_context}
+
+Always ensure your research and analysis is current and relevant to the present date.""",
                     },
-                    {"role": "user", "content": prompt},
+                    {"role": "user", "content": f"{prompt}\n\nNote: Please consider the current date and time context in your analysis."},
                 ],
             )
             return response.choices[0].message.content
@@ -220,7 +234,7 @@ RESEARCH FINDINGS:
 Provide your analysis in this format:
 
 MAIN PRICE PREDICTION:
-[Specific price range with timeframe, e.g., "$X to $Y by [date]" with probability]
+[Specific price range with timeframe, e.g., "$X to $Y by [date]"]
 
 KEY FACTORS DRIVING THIS PREDICTION:
 - [Most important factor]
@@ -228,19 +242,19 @@ KEY FACTORS DRIVING THIS PREDICTION:
 - [Third most important factor]
 
 PRICE SCENARIOS:
-1. Bull Case: $[price] (probability: X%)
+1. Bull Case: $[price]
    - Key drivers
    - Required conditions
    - Technical levels
    - Timeline
 
-2. Base Case: $[price] (probability: Y%)
+2. Base Case: $[price]
    - Key drivers
    - Required conditions
    - Technical levels
    - Timeline
 
-3. Bear Case: $[price] (probability: Z%)
+3. Bear Case: $[price]
    - Key drivers
    - Required conditions
    - Technical levels
@@ -267,23 +281,22 @@ KEY PRICE LEVELS TO WATCH:
         """Generate the final prediction using OpenAI."""
         try:
             prompt = self._create_prediction_prompt(question, research)
+            time_context = self._get_time_context()
+
+            default_system_prompt = f"""You are a precise analytical engine specializing in price predictions. Your goal is to make decisive predictions with clear price targets and differentiated probabilities.
+
+{time_context}
+
+Always provide specific price targets with clear ranges. If uncertain, explain the uncertainties but still provide your best price targets based on the available data and research. Ensure all predictions and analysis are made within the current time context.
+
+If your confidence level is 4 or lower, start your response with a note suggesting the user to provide more context about the token/project (e.g., full project name, website, or other identifying information) to get a more accurate prediction."""
 
             completion = self.openai_client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
                     {
                         "role": "system",
-                        "content": system_prompt if system_prompt else """You are a precise analytical engine specializing in price predictions. Your goal is to make decisive predictions with clear price targets and differentiated probabilities.
-
-PROBABILITY GUIDELINES:
-- Never use 50% as it indicates complete uncertainty
-- Base case should be your highest probability scenario (35-65%)
-- Alternative scenarios should have differentiated probabilities that reflect your analysis
-- Total probabilities must sum to 100%
-- Use specific probability numbers (e.g., 42% not 40-45%)
-- Back up probability assignments with specific factors from your research
-
-Always provide specific price targets with clear ranges. If uncertain, explain the uncertainties but still provide your best price targets based on the available data and research.""",
+                        "content": system_prompt if system_prompt else default_system_prompt,
                     },
                     {"role": "user", "content": prompt},
                 ],
