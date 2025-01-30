@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "mech-flask"
+name = "app"
 version = "0.1.0"
 description = ""
 authors = ["0xArdi <ardianabazi09@gmail.com>", "nic0xflamel <nicflamel0x@gmail.com>"]

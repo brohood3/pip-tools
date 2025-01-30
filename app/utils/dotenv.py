@@ -25,7 +25,7 @@ def ensure_var(var_name: str, default: str = None, is_required: bool = True) -> 
     if var_name in os.environ:
         return os.environ[var_name]
 
-    if is_required:
+    if is_required and not default:
         raise MissingEnvVarException(var_name)
 
     return default
