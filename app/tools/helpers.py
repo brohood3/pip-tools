@@ -51,7 +51,7 @@ for module_info in pkgutil.iter_modules(tools.__path__):
         config_data = load_module_config(module)
         tools_module = load_tools_module(module)
         if config_data and tools_module:
-            if config_data["name"] != module_info.name:
+            if config_data["name"].lower() != module_info.name.lower():
                 raise ToolError(
                     module_name,
                     f"Config name '{config_data['name']}' does not match module name '{module_info.name}'",
