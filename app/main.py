@@ -60,9 +60,13 @@ async def run_tool_selector(request: ToolSelectorRequest):
 @app.post("/{tool_name}")
 async def run_tool(tool_name: str, request: PromptRequest):
     """Generic endpoint for all other tools"""
-    if tool_name not in TOOL_TO_MODULE:
+    # Case-insensitive lookup
+    tool_name_lower = tool_name.lower()
+    available_tools = {k.lower(): v for k, v in TOOL_TO_MODULE.items()}
+    
+    if tool_name_lower not in available_tools:
         raise ToolNotFoundError(tool_name)
 
-    tool = TOOL_TO_MODULE[tool_name]
+    tool = available_tools[tool_name_lower]
     result = tool.run(request.prompt, request.system_prompt)
     return {"result": result}
