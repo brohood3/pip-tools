@@ -1,0 +1,37 @@
+name: LC_early_caller
+description: Identifies early cryptocurrency opportunities using LunarCrush data, analyzing both market metrics and social sentiment.
+version: "1.0"
+use_cases:
+  - Finding early stage cryptocurrency opportunities
+  - Screening for promising micro-cap tokens
+  - Identifying coins with improving social and market metrics
+example_prompts:
+  - "Find early opportunities in micro cap coins"
+  - "Screen for promising tokens under $10M market cap"
+  - "Find coins with improving Galaxy Score and sentiment"
+required_params:
+  prompt: string
+api_keys:
+  lunar: string
+  openai: string
+output_format:
+  response: string  # AI analysis of opportunities
+  metadata:
+    coins_analyzed: number
+    passed_initial_screen: number
+    final_opportunities: number
+    opportunities:
+      name: string
+      symbol: string
+      market_cap: number
+      volume_24h: number
+      galaxy_score:
+        current: number
+        previous: number
+      alt_rank:
+        current: number
+        previous: number
+      price_changes:
+        daily: number
+        weekly: number
+    timestamp: string 
