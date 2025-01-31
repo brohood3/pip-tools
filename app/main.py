@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 
-from app.models.api import PromptRequest
+from app.models.api import PromptRequest, ToolSelectorRequest
 from app.tools.helpers import TOOLS, TOOL_TO_MODULE
 from app.utils.errors import ToolNotFoundError, AppError
 from app.utils.logging import logger
@@ -50,12 +50,19 @@ async def list_tools():
     return dict(tools=TOOLS)
 
 
+@app.post("/tool_selector")
+async def run_tool_selector(request: ToolSelectorRequest):
+    """Special endpoint for tool selector that supports filtering available tools"""
+    tool = TOOL_TO_MODULE["tool_selector"]
+    result = tool.run(request.prompt, request.system_prompt, allowed_tools=request.allowed_tools)
+    return {"result": result}
+
 @app.post("/{tool_name}")
 async def run_tool(tool_name: str, request: PromptRequest):
+    """Generic endpoint for all other tools"""
     if tool_name not in TOOL_TO_MODULE:
         raise ToolNotFoundError(tool_name)
 
     tool = TOOL_TO_MODULE[tool_name]
     result = tool.run(request.prompt, request.system_prompt)
-
     return {"result": result}

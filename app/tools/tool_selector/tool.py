@@ -50,12 +50,15 @@ class NoToolResult(TypedDict):
 
 
 # --- Configuration Loading ---
-def load_tool_configs() -> ToolsConfig:
+def load_tool_configs(allowed_tools: Optional[List[str]] = None) -> ToolsConfig:
     """
-    Load all tool configurations from app/tools directory.
+    Load tool configurations from app/tools directory.
+    
+    Args:
+        allowed_tools: Optional list of tool names to load. If None, loads all tools.
 
     Returns:
-        Dict containing all tool configurations, keyed by tool name.
+        Dict containing tool configurations, keyed by tool name.
     """
     tools = {}
 
@@ -70,7 +73,9 @@ def load_tool_configs() -> ToolsConfig:
         if os.path.exists(config_path):
             with open(config_path, "r") as f:
                 config = yaml.safe_load(f)
-                tools[config["name"]] = config
+                # Only include tool if it's in allowed_tools (or if allowed_tools is None)
+                if allowed_tools is None or config["name"] in allowed_tools:
+                    tools[config["name"]] = config
 
     return {"tools": tools}
 
@@ -212,7 +217,12 @@ def parse_tool_selection(
 
 
 # --- Main Logic ---
-def get_tool_for_prompt(client: OpenAI, prompt: str, system_prompt: Optional[str] = None) -> Union[ToolResult, NoToolResult]:
+def get_tool_for_prompt(
+    client: OpenAI, 
+    prompt: str, 
+    system_prompt: Optional[str] = None,
+    allowed_tools: Optional[List[str]] = None
+) -> Union[ToolResult, NoToolResult]:
     """
     Main function to determine which tool to use for a given prompt.
 
@@ -220,13 +230,24 @@ def get_tool_for_prompt(client: OpenAI, prompt: str, system_prompt: Optional[str
         client: OpenAI client instance
         prompt: User's original request
         system_prompt: Optional custom system prompt for tool selection
+        allowed_tools: Optional list of allowed tool names. If None, all tools are available.
 
     Returns:
         Dictionary containing either:
         - Selected tool info with confidence and required parameters
         - No tool selected with explanation message
     """
-    tools_config = load_tool_configs()
+    tools_config = load_tool_configs(allowed_tools)
+
+    # If no tools are available after filtering
+    if not tools_config["tools"]:
+        return {
+            "response": {
+                "tool": "none",
+                "message": "No tools are available for this request."
+            },
+            "metadata": {"prompt": prompt, "timestamp": datetime.now().isoformat()}
+        }
 
     # Stage 1: Analyze intent
     intent_analysis = analyze_intent(client, prompt)
@@ -250,11 +271,9 @@ def get_tool_for_prompt(client: OpenAI, prompt: str, system_prompt: Optional[str
                 "tool": tool,
                 "confidence": confidence,
                 "reasoning": reasoning,
-                "required_params": tools_config["tools"][tool].get(
-                    "required_params", {}
-                ),
+                "required_params": tools_config["tools"][tool].get("required_params", {}),
             },
-            "metadata": {"prompt": prompt, "timestamp": datetime.now().isoformat()},
+            "metadata": {"prompt": prompt, "timestamp": datetime.now().isoformat()}
         }
         if additional_info:
             result["response"]["additional_info"] = additional_info
@@ -268,10 +287,10 @@ def get_tool_for_prompt(client: OpenAI, prompt: str, system_prompt: Optional[str
         return {
             "response": {
                 "tool": "none",
-                "message": f"Cannot confidently match this request to available tools. Our tools can help with:\n"
+                "message": f"Cannot confidently match this request to available tools. Available tools can help with:\n"
                 + "\n".join(capabilities),
             },
-            "metadata": {"prompt": prompt, "timestamp": datetime.now().isoformat()},
+            "metadata": {"prompt": prompt, "timestamp": datetime.now().isoformat()}
         }
 
 
@@ -325,6 +344,17 @@ if __name__ == "__main__":
 openai_client = OpenAI()
 
 
-# added the following to have uniformity in the way we call tools
-def run(prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
-    return get_tool_for_prompt(openai_client, prompt, system_prompt)
+# Add the run function to match the API
+def run(prompt: str, system_prompt: Optional[str] = None, allowed_tools: Optional[List[str]] = None) -> Dict[str, Any]:
+    """
+    Main entry point for the tool selector.
+    
+    Args:
+        prompt: User's request
+        system_prompt: Optional custom system prompt
+        allowed_tools: Optional list of allowed tool names
+        
+    Returns:
+        Tool selection result
+    """
+    return get_tool_for_prompt(openai_client, prompt, system_prompt, allowed_tools)
