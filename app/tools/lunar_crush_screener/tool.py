@@ -1,5 +1,5 @@
 """
-Early Caller Tool
+LunarCrush Screener Tool
 
 A tool to identify early cryptocurrency opportunities using LunarCrush data:
 1) Analyzes snapshot data (galaxy_score & alt_rank changes)
@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field, validator
 # Load environment variables
 load_dotenv()
 
-class EarlyCallerConfig(BaseModel):
+class LunarCrushScreenerConfig(BaseModel):
     """Configuration model for Early Caller screening parameters."""
     
     SCORE_DIFF_THRESHOLD: float = Field(
@@ -127,7 +127,7 @@ class EarlyCallerConfig(BaseModel):
         # Allow extra fields to be ignored
         extra = "ignore"
 
-class EarlyCaller:
+class LunarCrushScreener:
     """Early opportunity detection tool using LunarCrush data and GPT-4."""
 
     def __init__(self):
@@ -427,7 +427,7 @@ class EarlyCaller:
         except Exception as e:
             return f"Error getting LLM analysis: {str(e)}"
 
-    def _extract_config_from_prompt(self, prompt: str) -> EarlyCallerConfig:
+    def _extract_config_from_prompt(self, prompt: str) -> LunarCrushScreenerConfig:
         """Extract and validate configuration from prompt."""
         config_prompt = f"""
         Analyze this request and configure appropriate parameters: "{prompt}"
@@ -469,15 +469,15 @@ class EarlyCaller:
                 temperature=0.5  
             )
             
-            config = EarlyCallerConfig.parse_raw(response.choices[0].message.content)
+            config = LunarCrushScreenerConfig.parse_raw(response.choices[0].message.content)
             return config
             
         except Exception as e:
-            return EarlyCallerConfig()
+            return LunarCrushScreenerConfig()
 
 # Function to match the interface pattern of other tools
 def run(prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
-    return EarlyCaller().run(prompt, system_prompt)
+    return LunarCrushScreener().run(prompt, system_prompt)
 
 if __name__ == "__main__":
     # Test prompts with more natural language
@@ -504,7 +504,7 @@ if __name__ == "__main__":
         "show stable coins between 10M-500M market cap with low price volatility but improving metrics"
     ]
 
-    tool = EarlyCaller()
+    tool = LunarCrushScreener()
     
     for prompt in test_prompts:
         print("\n" + "="*80)

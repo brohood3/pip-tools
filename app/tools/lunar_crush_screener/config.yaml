@@ -1,4 +1,4 @@
-name: lc_early_caller
+name: lunar_crush_screener
 description: Identifies early cryptocurrency opportunities using LunarCrush data, analyzing both market metrics and social sentiment.
 version: "1.0"
 use_cases:
