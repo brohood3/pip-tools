@@ -620,7 +620,7 @@ class TechnicalAnalysis:
                 raise Exception(f"Could not find coin ID for {symbol}")
             
             url = f"{LUNARCRUSH_BASE_URL}/public/coins/{coin_id}/time-series/v2"
-            
+                
             # Calculate start and end times
             end = int(datetime.now().timestamp())
             hours = LUNARCRUSH_INTERVALS.get(interval)
@@ -649,7 +649,7 @@ class TechnicalAnalysis:
             response = requests.get(url, params=params, headers=headers)
             if response.status_code != 200:
                 raise Exception(f"Failed to fetch candle data: {response.text}")
-            
+                
             data = response.json()
             if not data.get('data'):
                 raise Exception("No candle data received")
@@ -666,13 +666,16 @@ class TechnicalAnalysis:
                         continue
                         
                     # Map the fields exactly as pandas_ta expects them
+                    raw_volume = candle.get('volume_24h', 0)
+                    print(f"Raw volume from API: {raw_volume}")
+                    
                     candle_dict = {
                         "time": timestamp,
                         "open": float(candle['open']),
                         "high": float(candle['high']),
                         "low": float(candle['low']),
                         "close": float(candle['close']),
-                        "volume": float(candle.get('volume_24h', 0))  # Map volume_24h to volume
+                        "volume": float(raw_volume)  # Keep as float for calculations
                     }
                     candles.append(candle_dict)
                 except (KeyError, ValueError) as e:
@@ -685,8 +688,9 @@ class TechnicalAnalysis:
             # Sort candles by time to ensure proper order
             candles.sort(key=lambda x: x['time'])
             
+            # NOTE: Don't convert volume to string here - keep as float for calculations
             return candles
-            
+
         except Exception as e:
             print(f"Error in fetch_candle_data: {str(e)}")
             return None
@@ -1480,30 +1484,28 @@ IMPORTANT: Respond with ONLY the raw JSON object. Do not include markdown format
             traceback.print_exc()
             return None
 
-    def format_indicators_json(self, indicators: Dict[str, Any]) -> Dict[str, Any]:
-        """Format raw indicator data into a structured JSON format.
-
-        Organizes indicators into logical categories for better readability and analysis:
-        - Moving Averages (SMA, EMA)
-        - Trend Indicators (Supertrend, ADX, DMI)
-        - Volume and Volatility metrics
-        - Momentum Indicators (MACD, RSI)
-        - Price Bands and Support/Resistance levels
-        - Complex Indicators (Ichimoku)
-
+    def _convert_large_floats(self, obj):
+        """Recursively convert large float values to strings to ensure JSON compliance.
+        
         Args:
-            indicators (Dict[str, Any]): Raw indicator data from API
-
+            obj: Any Python object that might contain float values
+            
         Returns:
-            Dict[str, Any]: Structured indicator data organized by categories
-
-        Example:
-            >>> format_indicators_json({"sma": {"period_20": 45000}, "rsi": {"value": 65}})
-            {
-                "moving_averages": {"sma": {"period_20": 45000}},
-                "momentum": {"rsi": {"value": 65}}
-            }
+            The same object with large floats converted to strings
         """
+        if isinstance(obj, float):
+            # Convert large floats to strings
+            if abs(obj) > 1e10:
+                return str(obj)
+            return obj
+        elif isinstance(obj, dict):
+            return {k: self._convert_large_floats(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self._convert_large_floats(item) for item in obj]
+        return obj
+
+    def format_indicators_json(self, indicators: Dict[str, Any]) -> Dict[str, Any]:
+        """Format raw indicator data into a structured JSON format."""
         try:
             formatted = {}
 
@@ -1544,20 +1546,8 @@ IMPORTANT: Respond with ONLY the raw JSON object. Do not include markdown format
             if momentum:
                 formatted["momentum"] = momentum
 
-            # Price Bands and Support/Resistance
-            price = {}
-            if "bbands" in indicators:
-                price["bollinger"] = indicators["bbands"]
-            if "fibonacciretracement" in indicators:
-                price["fibonacci"] = indicators["fibonacciretracement"]
-            if price:
-                formatted["price"] = price
-
-            # Complex Indicators
-            if "ichimoku" in indicators:
-                formatted["ichimoku"] = indicators["ichimoku"]
-
-            return formatted
+            # Convert any large float values to strings before returning
+            return self._convert_large_floats(formatted)
 
         except Exception as e:
             print(f"Error formatting indicators: {str(e)}")
@@ -1955,12 +1945,12 @@ def test_indicators():
                 volume = df['volume'].iloc[i]
                 if price in price_volume:
                     price_volume[price] += volume
-                else:
+            else:
                     price_volume[price] = volume
             sorted_prices = sorted(price_volume.items(), key=lambda x: x[1], reverse=True)
             high_volume_levels = [float(price) for price, _ in sorted_prices[:3]]
             print("✓ High Volume Nodes Found:", len(high_volume_levels))
-
+                
         except Exception as e:
             print(f"❌ Error in Price Action Indicators: {str(e)}")
             import traceback
