@@ -1,14 +1,16 @@
-name: ta_essential
-description: Essential Technical Analysis Tool using key indicators for cryptocurrency market analysis. Focuses on high-probability trade setups with clear entry/exit points.
+name: technical_analysis
+description: Technical Analysis Tool providing comprehensive market analysis using key technical indicators. Focuses on high-probability trade setups with clear entry/exit points and risk management rules.
 version: "1.0"
 use_cases:
-  - Identifying high-probability trading setups using essential indicators
-  - Analyzing market structure and key price levels
-  - Getting precise entry/exit points with risk management rules
+  - Performing detailed technical analysis using multiple indicator categories
+  - Identifying high-probability trading setups with precise entry/exit points
+  - Analyzing market structure, trends, and key price levels
+  - Generating risk-managed trading strategies with clear rules
 example_prompts:
-  - "Find trading setups for ETH/USD on the 4h timeframe"
-  - "Analyze BTC/USDT for potential entries with clear stop loss levels"
-  - "Show me high-probability setups for SOL/USD with risk management rules"
+  - "Analyze ETH/USDT trend on 4h timeframe with volume confirmation"
+  - "Find momentum setups for BTC/USDT using RSI and MACD"
+  - "Look for breakout opportunities in SOL/USDT with Bollinger Bands"
+  - "Give me scalping setups for BNB/USDT on 5min chart"
 required_params:
   prompt: string
 api_keys:
