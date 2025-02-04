@@ -68,5 +68,5 @@ async def run_tool(tool_name: str, request: PromptRequest):
         raise ToolNotFoundError(tool_name)
 
     tool = available_tools[tool_name_lower]
-    result = await tool.run(request.prompt, request.system_prompt)
+    result = tool.run(request.prompt, request.system_prompt)
     return {"result": result}
