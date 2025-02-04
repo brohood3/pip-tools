@@ -17,24 +17,419 @@ and risk management rules across different timeframes and trading styles.
 
 import os
 import requests
-import aiohttp
-import asyncio
-from typing import Dict, Optional, List, TypedDict, Union, Any, Set
-from datetime import datetime
+from typing import Dict, Optional, List, TypedDict, Union, Any, Set, Tuple
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import json
 from openai import OpenAI
 from fastapi import HTTPException
-
-from app.tools.technical_analysis.indicators import IndicatorRegistry, IndicatorCategory
+import pandas as pd
+import pandas_ta as ta
+from io import BytesIO
+import base64
+from dataclasses import dataclass
+from enum import Enum
 
 # Load environment variables
 load_dotenv()
 
+class IndicatorCategory(Enum):
+    """Categories for different types of technical indicators."""
+    MOVING_AVERAGE = "moving_average"
+    TREND = "trend"
+    MOMENTUM = "momentum"
+    VOLUME = "volume"
+    VOLATILITY = "volatility"
+    PRICE_ACTION = "price_action"
+
+class IndicatorParams(TypedDict, total=False):
+    """Parameters that can be passed to indicators."""
+    period: Optional[int]
+    multiplier: Optional[float]
+    length: Optional[int]
+
+@dataclass
+class Indicator:
+    """Represents a technical indicator with its metadata."""
+    name: str
+    category: IndicatorCategory
+    priority: int  # 1 = base indicator, 2 = common, 3 = specialized
+    params: IndicatorParams
+    requires_volume: bool = False
+    description: str = ""
+
+class IndicatorRegistry:
+    """Central registry for all technical indicators."""
+    
+    def __init__(self):
+        """Initialize the indicator registry with all available indicators."""
+        self._indicators: Dict[str, Indicator] = {
+            # Moving Averages (Priority 1-2)
+            "sma": Indicator(
+                name="sma",
+                category=IndicatorCategory.MOVING_AVERAGE,
+                priority=1,
+                params={"period": 20},
+                description="Simple Moving Average"
+            ),
+            "ema": Indicator(
+                name="ema",
+                category=IndicatorCategory.MOVING_AVERAGE,
+                priority=1,
+                params={"period": 20},
+                description="Exponential Moving Average"
+            ),
+            "dema": Indicator(
+                name="dema",
+                category=IndicatorCategory.MOVING_AVERAGE,
+                priority=2,
+                params={"period": 20},
+                description="Double Exponential Moving Average"
+            ),
+            "tema": Indicator(
+                name="tema",
+                category=IndicatorCategory.MOVING_AVERAGE,
+                priority=2,
+                params={"period": 20},
+                description="Triple Exponential Moving Average"
+            ),
+            "vwma": Indicator(
+                name="vwma",
+                category=IndicatorCategory.MOVING_AVERAGE,
+                priority=2,
+                params={"period": 20},
+                requires_volume=True,
+                description="Volume Weighted Moving Average"
+            ),
+            "wma": Indicator(
+                name="wma",
+                category=IndicatorCategory.MOVING_AVERAGE,
+                priority=2,
+                params={"period": 20},
+                description="Weighted Moving Average"
+            ),
+            "hma": Indicator(
+                name="hma",
+                category=IndicatorCategory.MOVING_AVERAGE,
+                priority=2,
+                params={"period": 20},
+                description="Hull Moving Average"
+            ),
+            
+            # Trend Indicators (Priority 1-2)
+            "supertrend": Indicator(
+                name="supertrend",
+                category=IndicatorCategory.TREND,
+                priority=1,
+                params={},
+                description="SuperTrend indicator"
+            ),
+            "adx": Indicator(
+                name="adx",
+                category=IndicatorCategory.TREND,
+                priority=1,
+                params={},
+                description="Average Directional Index"
+            ),
+            "dmi": Indicator(
+                name="dmi",
+                category=IndicatorCategory.TREND,
+                priority=1,
+                params={},
+                description="Directional Movement Index"
+            ),
+            "vortex": Indicator(
+                name="vortex",
+                category=IndicatorCategory.TREND,
+                priority=2,
+                params={},
+                description="Vortex Indicator"
+            ),
+            "psar": Indicator(
+                name="psar",
+                category=IndicatorCategory.TREND,
+                priority=2,
+                params={},
+                description="Parabolic SAR"
+            ),
+            "trix": Indicator(
+                name="trix",
+                category=IndicatorCategory.TREND,
+                priority=2,
+                params={},
+                description="Triple Exponential Average"
+            ),
+            "kst": Indicator(
+                name="kst",
+                category=IndicatorCategory.TREND,
+                priority=2,
+                params={},
+                description="Know Sure Thing"
+            ),
+            
+            # Volume Indicators (Priority 1-2)
+            "volume": Indicator(
+                name="volume",
+                category=IndicatorCategory.VOLUME,
+                priority=1,
+                params={},
+                requires_volume=True,
+                description="Raw volume"
+            ),
+            "obv": Indicator(
+                name="obv",
+                category=IndicatorCategory.VOLUME,
+                priority=2,
+                params={},
+                requires_volume=True,
+                description="On Balance Volume"
+            ),
+            "cmf": Indicator(
+                name="cmf",
+                category=IndicatorCategory.VOLUME,
+                priority=2,
+                params={},
+                requires_volume=True,
+                description="Chaikin Money Flow"
+            ),
+            "vwap": Indicator(
+                name="vwap",
+                category=IndicatorCategory.VOLUME,
+                priority=1,
+                params={},
+                requires_volume=True,
+                description="Volume Weighted Average Price"
+            ),
+            "pvt": Indicator(
+                name="pvt",
+                category=IndicatorCategory.VOLUME,
+                priority=2,
+                params={},
+                requires_volume=True,
+                description="Price Volume Trend"
+            ),
+            "mfi": Indicator(
+                name="mfi",
+                category=IndicatorCategory.VOLUME,
+                priority=2,
+                params={"length": 14},
+                requires_volume=True,
+                description="Money Flow Index"
+            ),
+            
+            # Momentum Indicators (Priority 1-2)
+            "rsi": Indicator(
+                name="rsi",
+                category=IndicatorCategory.MOMENTUM,
+                priority=1,
+                params={},
+                description="Relative Strength Index"
+            ),
+            "macd": Indicator(
+                name="macd",
+                category=IndicatorCategory.MOMENTUM,
+                priority=1,
+                params={},
+                description="Moving Average Convergence Divergence"
+            ),
+            "stoch": Indicator(
+                name="stoch",
+                category=IndicatorCategory.MOMENTUM,
+                priority=2,
+                params={},
+                description="Stochastic Oscillator"
+            ),
+            "cci": Indicator(
+                name="cci",
+                category=IndicatorCategory.MOMENTUM,
+                priority=2,
+                params={"length": 20},
+                description="Commodity Channel Index"
+            ),
+            "roc": Indicator(
+                name="roc",
+                category=IndicatorCategory.MOMENTUM,
+                priority=2,
+                params={"length": 12},
+                description="Rate of Change"
+            ),
+            "willr": Indicator(
+                name="willr",
+                category=IndicatorCategory.MOMENTUM,
+                priority=2,
+                params={"length": 14},
+                description="Williams %R"
+            ),
+            "ao": Indicator(
+                name="ao",
+                category=IndicatorCategory.MOMENTUM,
+                priority=2,
+                params={},
+                description="Awesome Oscillator"
+            ),
+            
+            # Volatility Indicators (Priority 1-2)
+            "bbands": Indicator(
+                name="bbands",
+                category=IndicatorCategory.VOLATILITY,
+                priority=1,
+                params={},
+                description="Bollinger Bands"
+            ),
+            "atr": Indicator(
+                name="atr",
+                category=IndicatorCategory.VOLATILITY,
+                priority=1,
+                params={},
+                description="Average True Range"
+            ),
+            "stddev": Indicator(
+                name="stddev",
+                category=IndicatorCategory.VOLATILITY,
+                priority=2,
+                params={},
+                description="Standard Deviation"
+            ),
+            "keltner": Indicator(
+                name="keltner",
+                category=IndicatorCategory.VOLATILITY,
+                priority=2,
+                params={},
+                description="Keltner Channels"
+            ),
+            "donchian": Indicator(
+                name="donchian",
+                category=IndicatorCategory.VOLATILITY,
+                priority=2,
+                params={"length": 20},
+                description="Donchian Channels"
+            ),
+            
+            # Price Action (Priority 2-3)
+            "fibonacciretracement": Indicator(
+                name="fibonacciretracement",
+                category=IndicatorCategory.PRICE_ACTION,
+                priority=2,
+                params={},
+                description="Fibonacci Retracement Levels"
+            ),
+            "pivotpoints": Indicator(
+                name="pivotpoints",
+                category=IndicatorCategory.PRICE_ACTION,
+                priority=2,
+                params={},
+                description="Pivot Points"
+            ),
+            "candlepatterns": Indicator(
+                name="candlepatterns",
+                category=IndicatorCategory.PRICE_ACTION,
+                priority=2,
+                params={},
+                description="Common Candlestick Patterns"
+            ),
+            "harmonicpatterns": Indicator(
+                name="harmonicpatterns",
+                category=IndicatorCategory.PRICE_ACTION,
+                priority=3,
+                params={},
+                description="Harmonic Price Patterns"
+            ),
+            "ichimoku": Indicator(
+                name="ichimoku",
+                category=IndicatorCategory.PRICE_ACTION,
+                priority=2,
+                params={},
+                description="Ichimoku Cloud"
+            ),
+            "pricelevels": Indicator(
+                name="pricelevels",
+                category=IndicatorCategory.PRICE_ACTION,
+                priority=2,
+                params={},
+                description="Key Price Levels and S/R"
+            ),
+        }
+
+        # Strategy-specific indicator mappings
+        self._strategy_indicators = {
+            "trend_following": [
+                IndicatorCategory.MOVING_AVERAGE,
+                IndicatorCategory.TREND
+            ],
+            "momentum": [
+                IndicatorCategory.MOMENTUM,
+                IndicatorCategory.VOLUME
+            ],
+            "mean_reversion": [
+                IndicatorCategory.VOLATILITY,
+                IndicatorCategory.MOMENTUM
+            ],
+            "breakout": [
+                IndicatorCategory.VOLATILITY,
+                IndicatorCategory.VOLUME,
+                IndicatorCategory.PRICE_ACTION
+            ],
+            "scalping": [
+                IndicatorCategory.MOMENTUM,
+                IndicatorCategory.VOLATILITY
+            ]
+        }
+
+    def get_base_indicators(self) -> List[Dict[str, Any]]:
+        """Get all priority 1 (base) indicators."""
+        return [
+            {"indicator": ind.name, **ind.params}
+            for ind in self._indicators.values()
+            if ind.priority == 1
+        ]
+
+    def get_indicators_by_category(self, category: IndicatorCategory) -> List[Dict[str, Any]]:
+        """Get all indicators in a specific category."""
+        return [
+            {"indicator": ind.name, **ind.params}
+            for ind in self._indicators.values()
+            if ind.category == category
+        ]
+
+    def get_indicators_for_strategy(self, strategy_type: str) -> List[Dict[str, Any]]:
+        """Get recommended indicators for a specific strategy type."""
+        if strategy_type not in self._strategy_indicators:
+            return []
+            
+        categories = self._strategy_indicators[strategy_type]
+        return [
+            {"indicator": ind.name, **ind.params}
+            for ind in self._indicators.values()
+            if ind.category in categories
+        ]
+
+    def is_valid_indicator(self, indicator_name: str) -> bool:
+        """Check if an indicator is valid."""
+        return indicator_name in self._indicators
+
 # API Configuration
-TAAPI_BASE_URL = "https://api.taapi.io"
-MAX_INDICATORS = 20  # Maximum number of indicators allowed by the API
+LUNARCRUSH_BASE_URL = "https://lunarcrush.com/api4"
+MAX_INDICATORS = 20  # Maximum number of indicators to calculate
 MIN_REQUIRED_INDICATORS = 2  # Minimum required indicators for valid analysis
+
+# Indicator Parameters
+MOVING_AVERAGE_PERIODS = [20, 50, 200]
+MACD_PARAMS = {"fast": 12, "slow": 26, "signal": 9}
+RSI_LENGTH = 14
+BBANDS_STD = 2
+SUPERTREND_PARAMS = {"length": 7, "multiplier": 3.0}
+ADX_LENGTH = 14
+STOCH_K_PERIOD = 14
+STOCH_D_PERIOD = 3
+ICHIMOKU_PARAMS = {
+    "tenkan": 9,    # Conversion line period
+    "kijun": 26,    # Base line period
+    "senkou": 52    # Leading span B period
+}
+KELTNER_LENGTH = 20
+KELTNER_SCALAR = 2
+MFI_LENGTH = 14
+WILLR_LENGTH = 14
 
 # Time Intervals and Horizons
 INTERVAL_HORIZONS = {
@@ -50,9 +445,23 @@ INTERVAL_HORIZONS = {
     "1w": "long-term (1-3 months)",
 }
 
+# LunarCrush Interval Mapping (to hours)
+LUNARCRUSH_INTERVALS = {
+    "1m": 1/60,
+    "5m": 5/60,
+    "15m": 15/60,
+    "30m": 30/60,
+    "1h": 1,
+    "2h": 2,
+    "4h": 4,
+    "12h": 12,
+    "1d": 24,
+    "1w": 24*7
+}
+
 # Default Analysis Parameters
 DEFAULT_TIMEFRAME = "1d"
-DEFAULT_EXCHANGE = "gateio"
+DEFAULT_EXCHANGE = "gateio"  # Kept for compatibility
 DEFAULT_STRATEGY = "trend_following"
 
 # Module-level instance for the run function
@@ -134,13 +543,13 @@ class TechnicalAnalysis:
     
     This class provides methods for analyzing cryptocurrency markets using various
     technical indicators, generating trading setups, and providing detailed market analysis.
-    It integrates with TAapi for indicator calculations and OpenAI for analysis generation.
+    It integrates with LunarCrush for indicator calculations and OpenAI for analysis generation.
     
     Attributes:
-        taapi_api_key (str): API key for TAapi service
+        lunarcrush_api_key (str): API key for LunarCrush service
         openai_api_key (str): API key for OpenAI service
         openai_client (OpenAI): OpenAI client instance
-        taapi_base_url (str): Base URL for TAapi endpoints
+        lunarcrush_base_url (str): Base URL for LunarCrush endpoints
         indicator_registry (IndicatorRegistry): Registry of available technical indicators
     """
 
@@ -151,81 +560,193 @@ class TechnicalAnalysis:
             ValueError: If required API keys are not set in environment variables
         """
         # Load API keys from environment
-        self.taapi_api_key = os.getenv("TAAPI_API_KEY")
-        if not self.taapi_api_key:
-            raise ValueError("TAAPI_API_KEY environment variable is not set")
+        self.lunarcrush_api_key = os.getenv("LUNARCRUSH_API_KEY")
+        if not self.lunarcrush_api_key:
+            raise ValueError("LUNARCRUSH_API_KEY environment variable is not set")
 
         self.openai_api_key = os.getenv("OPENAI_API_KEY")
         if not self.openai_api_key:
             raise ValueError("OPENAI_API_KEY environment variable is not set")
 
         self.openai_client = OpenAI(api_key=self.openai_api_key)
-        self.taapi_base_url = TAAPI_BASE_URL
         
         # Initialize indicator registry
         self.indicator_registry = IndicatorRegistry()
+        
+        # Cache for coin IDs to reduce API calls
+        self._coin_id_cache = {}
+
+    def get_lunarcrush_coin_id(self, symbol: str) -> Optional[int]:
+        """Get coin ID from LunarCrush API."""
+        try:
+            # Clean symbol - remove USD/USDT and standardize
+            symbol = symbol.upper().replace('/USD', '').replace('/USDT', '')
+            
+            # Check cache first
+            if symbol in self._coin_id_cache:
+                return self._coin_id_cache[symbol]
+            
+            url = f"{LUNARCRUSH_BASE_URL}/public/coins/list/v2"
+            headers = {
+                "Authorization": f"Bearer {self.lunarcrush_api_key}"
+            }
+            response = requests.get(url, headers=headers)
+            
+            if not response.ok:
+                print(f"Error fetching coin list: {response.status_code}")
+                print(f"Response: {response.text}")
+                return None
+                
+            data = response.json()
+            
+            # Find coin by symbol (case insensitive)
+            for coin in data.get('data', []):
+                if coin['symbol'].upper() == symbol:
+                    # Cache the result
+                    self._coin_id_cache[symbol] = coin['id']
+                    return coin['id']
+                    
+            return None
+            
+        except Exception as e:
+            print(f"Error getting coin ID: {str(e)}")
+            return None
+
+    def fetch_candle_data(self, symbol: str, interval: str, limit: int = 200) -> List[Dict[str, Any]]:
+        """Fetch historical candle data from LunarCrush API."""
+        try:
+            coin_id = self.get_lunarcrush_coin_id(symbol)
+            if not coin_id:
+                raise Exception(f"Could not find coin ID for {symbol}")
+            
+            url = f"{LUNARCRUSH_BASE_URL}/public/coins/{coin_id}/time-series/v2"
+            
+            # Calculate start and end times
+            end = int(datetime.now().timestamp())
+            hours = LUNARCRUSH_INTERVALS.get(interval)
+            if not hours:
+                raise Exception(f"Invalid interval: {interval}")
+            start = end - (int(limit * hours * 3600))  # Convert hours to seconds
+            
+            # Determine appropriate bucket based on interval
+            bucket = "hour"
+            if hours >= 24:  # If interval is 1d or longer
+                bucket = "day"
+            
+            params = {
+                "start": start,
+                "end": end,
+                "bucket": bucket
+            }
+            headers = {
+                "Authorization": f"Bearer {self.lunarcrush_api_key}"
+            }
+            
+            print(f"\nFetching data from LunarCrush:")
+            print(f"URL: {url}")
+            print(f"Params: {params}")
+            
+            response = requests.get(url, params=params, headers=headers)
+            if response.status_code != 200:
+                raise Exception(f"Failed to fetch candle data: {response.text}")
+            
+            data = response.json()
+            if not data.get('data'):
+                raise Exception("No candle data received")
+            
+            print(f"Received {len(data['data'])} candles")
+            
+            candles = []
+            for candle in data['data']:
+                try:
+                    timestamp = float(candle['time'])
+                    # Verify timestamp is not in the future
+                    if timestamp > end:
+                        print(f"Warning: Skipping future candle with timestamp {timestamp}")
+                        continue
+                        
+                    # Map the fields exactly as pandas_ta expects them
+                    candle_dict = {
+                        "time": timestamp,
+                        "open": float(candle['open']),
+                        "high": float(candle['high']),
+                        "low": float(candle['low']),
+                        "close": float(candle['close']),
+                        "volume": float(candle.get('volume_24h', 0))  # Map volume_24h to volume
+                    }
+                    candles.append(candle_dict)
+                except (KeyError, ValueError) as e:
+                    print(f"Warning: Skipping invalid candle data: {e}")
+                    continue
+            
+            if not candles:
+                raise Exception("No valid candle data after processing")
+            
+            # Sort candles by time to ensure proper order
+            candles.sort(key=lambda x: x['time'])
+            
+            return candles
+            
+        except Exception as e:
+            print(f"Error in fetch_candle_data: {str(e)}")
+            return None
+
+    def get_available_symbols_sync(self) -> List[str]:
+        """Get available coins from LunarCrush."""
+        try:
+            url = f"{LUNARCRUSH_BASE_URL}/public/coins/list/v2"
+            headers = {
+                "Authorization": f"Bearer {self.lunarcrush_api_key}"
+            }
+            response = requests.get(url, headers=headers)
+            
+            if not response.ok:
+                print(f"Error fetching symbols: {response.status_code}")
+                return self._get_fallback_symbols()
+                
+            data = response.json()
+            
+            # Just return the coin symbols
+            symbols = [coin['symbol'] for coin in data.get('data', [])]
+            return sorted(symbols)
+            
+        except Exception as e:
+            print(f"Error fetching symbols: {str(e)}")
+            return self._get_fallback_symbols()
 
     def run(self, prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
-        """Main entry point for the technical analysis tool.
-
-        This method orchestrates the entire analysis process:
-        1. Parses the user's prompt to extract analysis parameters
-        2. Identifies the appropriate trading pair
-        3. Fetches relevant technical indicators
-        4. Generates a comprehensive analysis using GPT-4
-
-        Args:
-            prompt (str): User's analysis request in natural language
-            system_prompt (Optional[str]): Optional system prompt to customize GPT's behavior
-
-        Returns:
-            Dict[str, Any]: Analysis results containing:
-                - response: Generated analysis text
-                - metadata: Analysis context and technical indicators used
-                - error: Error message if analysis fails
-
-        Raises:
-            HTTPException: If there's an error during analysis generation
-        """
+        """Main entry point for the technical analysis tool."""
         try:
-            print(f"\nReceived system prompt in run: {system_prompt}")  # Debug log
+            print(f"\nReceived system prompt in run: {system_prompt}")
             
             # Extract analysis parameters from prompt
             analysis_params = self.parse_prompt_with_llm(prompt)
             if not analysis_params["token"]:
-                return {
-                    "error": "Could not determine which token to analyze. Please specify a token."
-                }
+                return {"error": "Could not determine which token to analyze. Please specify a token."}
 
-            # Get available symbols and find best pair
+            # Get available symbols and find match
             available_symbols = self.get_available_symbols_sync()
             if not available_symbols:
-                return {
-                    "error": "Could not fetch available trading pairs. Please try again later."
-                }
+                return {"error": "Could not fetch available coins. Please try again later."}
 
-            pair = self.find_best_pair(analysis_params["token"], available_symbols)
-            if not pair:
-                return {
-                    "error": f"No trading pair found for {analysis_params['token']}. Please verify the token symbol and try again."
-                }
+            symbol = self.find_best_pair(analysis_params["token"], available_symbols)
+            if not symbol:
+                return {"error": f"No coin found for {analysis_params['token']}. Please verify the token symbol and try again."}
 
             # Fetch indicators
             indicators = self._fetch_indicators(
-                pair, 
+                symbol, 
                 interval=analysis_params["timeframe"],
                 selected_indicators=analysis_params["indicators"],
                 analysis_focus=analysis_params["analysis_focus"]
             )
             if not indicators:
-                return {
-                    "error": f"Insufficient data for {pair} on {analysis_params['timeframe']} timeframe."
-                }
+                return {"error": f"Insufficient data for {symbol} on {analysis_params['timeframe']} timeframe."}
 
             # Generate analysis
             analysis = self.generate_analysis(
                 indicators, 
-                pair, 
+                symbol, 
                 analysis_params["timeframe"], 
                 prompt,
                 system_prompt,
@@ -237,14 +758,14 @@ class TechnicalAnalysis:
             metadata = {
                 "prompt": prompt,
                 "token": analysis_params["token"],
-                "pair": pair,
+                "symbol": symbol,
                 "interval": analysis_params["timeframe"],
                 "strategy_type": analysis_params["strategy_type"],
                 "analysis_focus": list(analysis_params["analysis_focus"]),
                 "selected_indicators": list(analysis_params["indicators"]),
                 "timestamp": datetime.now().isoformat(),
                 "data_quality": "partial" if len(indicators) < len(analysis_params["indicators"]) else "full",
-                "technical_indicators": self.format_indicators_json(indicators),
+                "technical_indicators": self.format_indicators_json(indicators)
             }
 
             return {"response": analysis, "metadata": metadata}
@@ -257,7 +778,7 @@ class TechnicalAnalysis:
 
         Uses GPT to intelligently parse the user's natural language request and extract
         key parameters needed for technical analysis, including:
-        - Token/symbol to analyze
+        - Token/Symbol to analyze
         - Timeframe for analysis
         - Relevant technical indicators
         - Trading strategy type
@@ -371,7 +892,7 @@ Now analyze this request: "{prompt}"
 IMPORTANT: Respond with ONLY the raw JSON object. Do not include markdown formatting, code blocks, or any other text. The response should start with {{ and end with }}."""
 
             response = self.openai_client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-4o-mini",
                 messages=[
                     {
                         "role": "system",
@@ -407,213 +928,557 @@ IMPORTANT: Respond with ONLY the raw JSON object. Do not include markdown format
                 status_code=500, detail=f"Error parsing trading request: {str(e)}"
             )
 
-    def _fetch_exchange_symbols_sync(self, exchange: str) -> List[str]:
-        """Synchronously fetch available trading pairs from a specific exchange."""
-        try:
-            url = f"{self.taapi_base_url}/exchange-symbols"
-            response = requests.get(url, params={"secret": self.taapi_api_key, "exchange": exchange})
-            if response.status_code == 200:
-                symbols = response.json()
-                if isinstance(symbols, list):
-                    filtered_symbols = [
-                        symbol for symbol in symbols 
-                        if isinstance(symbol, str) and symbol.endswith("/USDT")
-                    ]
-                    print(f"\nFetched {len(symbols)} trading pairs from {exchange.capitalize()}")
-                    return filtered_symbols
-        except Exception as e:
-            print(f"\nError fetching {exchange} symbols: {str(e)}")
-        return []
-
-    def get_available_symbols_sync(self) -> List[str]:
-        """Get available trading pairs synchronously."""
-        try:
-            # Fetch from multiple exchanges
-            binance_symbols = self._fetch_exchange_symbols_sync("binance")
-            gateio_symbols = self._fetch_exchange_symbols_sync("gateio")
-            
-            # Combine and deduplicate symbols
-            all_symbols = set(binance_symbols + gateio_symbols)
-            return sorted(list(all_symbols)) if all_symbols else self._get_fallback_symbols()
-        except Exception as e:
-            print(f"\nError fetching trading pairs: {str(e)}")
-            return self._get_fallback_symbols()
-
-    def _get_fallback_symbols(self) -> List[str]:
-        """Provide a fallback list of common trading pairs.
-
-        Used when unable to fetch current trading pairs from exchanges.
-        Contains major cryptocurrencies paired with USDT.
-
-        Returns:
-            List[str]: List of common cryptocurrency trading pairs
-        """
-        print("\nUsing fallback symbol list")
-        return [
-            "BTC/USDT",
-            "ETH/USDT",
-            "BNB/USDT",
-            "SOL/USDT",
-            "XRP/USDT",
-            "ADA/USDT",
-            "DOGE/USDT",
-            "MATIC/USDT",
-            "DOT/USDT",
-            "LTC/USDT",
-            "AVAX/USDT",
-            "LINK/USDT",
-            "UNI/USDT",
-            "ATOM/USDT",
-            "ETC/USDT",
-            "XLM/USDT",
-            "ALGO/USDT",
-            "NEAR/USDT",
-            "FTM/USDT",
-            "SAND/USDT",
-        ]
-
     def find_best_pair(self, token: str, available_symbols: List[str]) -> Optional[str]:
-        """Find the best matching trading pair for a given token.
-
-        This method performs an exact match search for the token against available
-        trading pairs. It only returns USDT pairs to ensure consistency in analysis.
+        """Find the best matching coin symbol.
 
         Args:
-            token (str): Token symbol to find a pair for (e.g., "BTC", "ETH")
-            available_symbols (List[str]): List of available trading pairs
+            token (str): Token symbol to find (e.g., "BTC", "ETH")
+            available_symbols (List[str]): List of available coins
 
         Returns:
-            Optional[str]: The matching trading pair if found (e.g., "BTC/USDT"),
-                          None if no exact match is found
-
-        Example:
-            >>> find_best_pair("BTC", ["BTC/USDT", "ETH/USDT"])
-            "BTC/USDT"
+            Optional[str]: The matching symbol if found, None if no match
         """
         try:
             # Clean and standardize token
-            token = token.strip().upper()
-
-            # Remove /USDT if present
-            token = token.replace('/USDT', '')
+            token = token.strip().upper().replace('/USD', '').replace('/USDT', '')
             
-            # Try exact USDT pair match
-            exact_match = f"{token}/USDT"
-            if exact_match in available_symbols:
-                print(f"\nFound exact match: {exact_match}")
-                return exact_match
+            # Try exact match
+            if token in available_symbols:
+                print(f"\nFound exact match: {token}")
+                return token
             
             print(f"\nNo exact match found for token: {token}")
             return None
 
         except Exception as e:
-            print(f"\nError finding best pair: {str(e)}")
+            print(f"\nError finding symbol: {str(e)}")
             return None
 
     def _fetch_indicators(
-        self, symbol: str, interval: str = DEFAULT_TIMEFRAME, 
-        exchange: str = DEFAULT_EXCHANGE, 
+        self, symbol: str, interval: str = DEFAULT_TIMEFRAME,
         selected_indicators: Set[str] = None,
         analysis_focus: List[str] = None
     ) -> Optional[Dict[str, Any]]:
-        """Fetch and calculate technical indicators for a given trading pair.
-
-        This method fetches multiple technical indicators in a single batch request,
-        optimizing for both coverage and API usage. It combines:
-        - Base indicators (always included)
-        - User-selected indicators
-        - Category-specific indicators based on analysis focus
-
+        """Calculate technical indicators using pandas_ta.
+        
         Args:
-            symbol (str): Trading pair to analyze (e.g., "BTC/USDT")
-            interval (str, optional): Timeframe for analysis. Defaults to DEFAULT_TIMEFRAME
-            exchange (str, optional): Exchange to fetch data from. Defaults to DEFAULT_EXCHANGE
-            selected_indicators (Set[str], optional): Specific indicators requested by user
-            analysis_focus (List[str], optional): Categories of analysis to focus on
-
+            symbol: Trading pair to analyze (e.g., "BTC/USDT")
+            interval: Timeframe for analysis
+            selected_indicators: Set of indicators explicitly requested
+            analysis_focus: Categories of analysis to focus on
+            
         Returns:
-            Optional[Dict[str, Any]]: Dictionary of calculated indicators and their values,
-                                    None if insufficient valid indicators are available
-
-        Raises:
-            HTTPException: If there's an error fetching indicators from the API
+            Dictionary of calculated indicators or None if insufficient data
         """
         try:
-            url = f"{self.taapi_base_url}/bulk"
-            
-            # Start with base indicators
-            indicators = self.indicator_registry.get_base_indicators()
-            
-            # Add selected indicators if specified
-            if selected_indicators:
-                selected = self.indicator_registry.format_for_taapi(
-                    list(selected_indicators),
-                    MAX_INDICATORS - len(indicators)
-                )
-                indicators.extend(selected)
-            
-            # Add strategy-specific indicators if needed
-            if analysis_focus:
-                for focus in analysis_focus:
-                    if len(indicators) >= MAX_INDICATORS:
-                        break
-                    try:
-                        category = IndicatorCategory(focus)
-                        focus_indicators = self.indicator_registry.get_indicators_by_category(category)
-                        remaining_slots = MAX_INDICATORS - len(indicators)
-                        indicators.extend(focus_indicators[:remaining_slots])
-                    except ValueError:
-                        # Invalid category, skip it
-                        continue
-
-            # Process indicators
-            payload = {
-                "secret": self.taapi_api_key,
-                "construct": {
-                    "exchange": exchange,
-                    "symbol": symbol,
-                    "interval": interval,
-                    "indicators": indicators,
-                },
-            }
-
-            response = requests.post(url, json=payload)
-            if not response.ok:
-                print(f"Error Response Status: {response.status_code}")
-                print(f"Error Response Content: {response.text}")
+            # Fetch historical candle data
+            candle_data = self.fetch_candle_data(symbol, interval)
+            if not candle_data:
                 return None
-
-            data = response.json().get("data", [])
-
-            # Process response data
-            result = {}
+                
+            # Convert to DataFrame with proper structure for pandas_ta
+            df = pd.DataFrame(candle_data)
+            df['datetime'] = pd.to_datetime(df['time'], unit='s')
+            df.set_index('datetime', inplace=True)
+            
+            # Ensure we have the required columns in the correct order
+            required_columns = ['open', 'high', 'low', 'close', 'volume']
+            if not all(col in df.columns for col in required_columns):
+                missing = [col for col in required_columns if col not in df.columns]
+                raise ValueError(f"Missing required columns: {missing}")
+            
+            # Sort index and verify we have enough data
+            df.sort_index(inplace=True)
+            print("\nDataFrame Info:")
+            print(df.info())
+            print("\nFirst few rows:")
+            print(df[required_columns].head())
+            print("\nLast few rows:")
+            print(df[required_columns].tail())
+            
+            # Combine all required indicators
+            all_indicators = set()
+            
+            # 1. Add explicitly requested indicators
+            if selected_indicators:
+                all_indicators.update(selected_indicators)
+            
+            # 2. Add base indicators (priority 1)
+            base_indicators = {ind.name for ind in self.indicator_registry._indicators.values() 
+                             if ind.priority == 1}
+            all_indicators.update(base_indicators)
+            
+            # 3. Add strategy-specific indicators
+            if analysis_focus:
+                for category in analysis_focus:
+                    category_indicators = {ind.name for ind in self.indicator_registry._indicators.values() 
+                                        if ind.category.value == category.lower()}
+                    all_indicators.update(category_indicators)
+            
+            # Calculate indicators
+            results = {}
             valid_indicators = 0
             
-            for indicator_data in data:
-                if indicator_data.get("result") and not indicator_data.get("result").get("error"):
-                    if indicator_data["indicator"] in ["sma", "ema", "dema", "tema", "vwma"]:
-                        # Handle moving averages with different periods
-                        indicator_type = indicator_data["indicator"]
-                        if indicator_type not in result:
-                            result[indicator_type] = {}
-                        period = indicator_data.get("period", "20")
-                        result[indicator_type][f"period_{period}"] = indicator_data["result"].get("value")
-                    else:
-                        # Handle other indicators
+            for indicator in all_indicators:
+                config = self.indicator_registry._indicators.get(indicator)
+                if not config:
+                    continue
+                    
+                try:
+                    # Moving Averages
+                    if indicator == "sma":
+                        df.ta.sma(length=20, append=True)
+                        df.ta.sma(length=50, append=True)
+                        df.ta.sma(length=200, append=True)
+                        results[indicator] = {
+                            "SMA_20": float(df['SMA_20'].iloc[-1]),
+                            "SMA_50": float(df['SMA_50'].iloc[-1]),
+                            "SMA_200": float(df['SMA_200'].iloc[-1])
+                        }
                         valid_indicators += 1
-                        result[indicator_data["indicator"]] = indicator_data["result"]
+                    
+                    elif indicator == "ema":
+                        df.ta.ema(length=20, append=True)
+                        df.ta.ema(length=50, append=True)
+                        df.ta.ema(length=200, append=True)
+                        results[indicator] = {
+                            "EMA_20": float(df['EMA_20'].iloc[-1]),
+                            "EMA_50": float(df['EMA_50'].iloc[-1]),
+                            "EMA_200": float(df['EMA_200'].iloc[-1])
+                        }
+                        valid_indicators += 1
+                    
+                    elif indicator == "dema":
+                        df.ta.dema(length=20, append=True)
+                        results[indicator] = {
+                            "value": float(df['DEMA_20'].iloc[-1])
+                        }
+                        valid_indicators += 1
+                    
+                    elif indicator == "tema":
+                        df.ta.tema(length=20, append=True)
+                        results[indicator] = {
+                            "value": float(df['TEMA_20'].iloc[-1])
+                        }
+                        valid_indicators += 1
+                    
+                    elif indicator == "vwma":
+                        df.ta.vwma(length=20, append=True)
+                        results[indicator] = {
+                            "value": float(df['VWMA_20'].iloc[-1])
+                        }
+                        valid_indicators += 1
+                    
+                    elif indicator == "wma":
+                        df.ta.wma(length=20, append=True)
+                        results[indicator] = {
+                            "value": float(df['WMA_20'].iloc[-1])
+                        }
+                        valid_indicators += 1
+                        
+                    elif indicator == "hma":
+                        df.ta.hma(length=20, append=True)
+                        results[indicator] = {
+                            "value": float(df['HMA_20'].iloc[-1])
+                        }
+                        valid_indicators += 1
+                    
+                    # Trend Indicators
+                    elif indicator == "adx":
+                        df.ta.adx(append=True)
+                        results[indicator] = {
+                            "value": float(df['ADX_14'].iloc[-1]),
+                            "plus_di": float(df['DMP_14'].iloc[-1]),
+                            "minus_di": float(df['DMN_14'].iloc[-1])
+                        }
+                        valid_indicators += 1
+                    
+                    elif indicator == "supertrend":
+                        df.ta.supertrend(append=True)
+                        results[indicator] = {
+                            "trend": float(df['SUPERT_7_3.0'].iloc[-1]),
+                            "value": float(df['SUPERT_7_3.0'].iloc[-1])
+                        }
+                        valid_indicators += 1
+                    
+                    # Additional Trend Indicators
+                    elif indicator == "psar":
+                        df.ta.psar(append=True)
+                        results[indicator] = {
+                            "value": float(df['PSARl_0.02_0.2'].iloc[-1]),
+                            "trend": float(df['PSARr_0.02_0.2'].iloc[-1])
+                        }
+                        valid_indicators += 1
+                        
+                    elif indicator == "trix":
+                        df.ta.trix(length=20, append=True)
+                        results[indicator] = {
+                            "value": float(df['TRIX_20_9'].iloc[-1]),
+                            "signal": float(df['TRIXs_20_9'].iloc[-1])
+                        }
+                        valid_indicators += 1
+                        
+                    elif indicator == "kst":
+                        df.ta.kst(append=True)
+                        results[indicator] = {
+                            "value": float(df['KST_10_15_20_30_10_10_10_15'].iloc[-1]),
+                            "signal": float(df['KSTs_9'].iloc[-1])
+                        }
+                        valid_indicators += 1
+                    
+                    # Volume Indicators
+                    elif indicator == "volume":
+                        volume_current = float(df['volume'].iloc[-1])
+                        volume_sma = float(df['volume'].rolling(window=20).mean().iloc[-1])
+                        results[indicator] = {
+                            "current": volume_current,
+                            "sma": volume_sma
+                        }
+                        valid_indicators += 1
+                    
+                    elif indicator == "obv":
+                        df.ta.obv(append=True)
+                        results[indicator] = {
+                            "value": float(df['OBV'].iloc[-1])
+                        }
+                        valid_indicators += 1
+                    
+                    elif indicator == "cmf":
+                        df.ta.cmf(append=True)
+                        results[indicator] = {
+                            "value": float(df['CMF_20'].iloc[-1])
+                        }
+                        valid_indicators += 1
+                    
+                    # Additional Volume Indicators
+                    elif indicator == "vwap":
+                        df.ta.vwap(append=True)
+                        results[indicator] = {
+                            "value": float(df['VWAP_D'].iloc[-1])
+                        }
+                        valid_indicators += 1
+                        
+                    elif indicator == "pvt":
+                        df.ta.pvt(append=True)
+                        results[indicator] = {
+                            "value": float(df['PVT'].iloc[-1])
+                        }
+                        valid_indicators += 1
+                        
+                    elif indicator == "mfi":
+                        # Convert volume to int64 before calculation
+                        df['volume'] = df['volume'].fillna(0).astype('int64')  # Handle NaN values before conversion
+                        df.ta.mfi(length=14, append=True)
+                        results[indicator] = {
+                            "value": float(df['MFI_14'].iloc[-1])
+                        }
+                        valid_indicators += 1
+                    
+                    # Momentum Indicators
+                    elif indicator == "rsi":
+                        df.ta.rsi(length=14, append=True)
+                        results[indicator] = {
+                            "value": float(df['RSI_14'].iloc[-1])
+                        }
+                        valid_indicators += 1
+                    
+                    elif indicator == "macd":
+                        df.ta.macd(append=True)
+                        results[indicator] = {
+                            "value": float(df['MACD_12_26_9'].iloc[-1]),
+                            "signal": float(df['MACDs_12_26_9'].iloc[-1]),
+                            "histogram": float(df['MACDh_12_26_9'].iloc[-1])
+                        }
+                        valid_indicators += 1
+                    
+                    elif indicator == "stoch":
+                        df.ta.stoch(append=True)
+                        results[indicator] = {
+                            "k": float(df['STOCHk_14_3_3'].iloc[-1]),
+                            "d": float(df['STOCHd_14_3_3'].iloc[-1])
+                        }
+                        valid_indicators += 1
+                    
+                    # Additional Momentum Indicators
+                    elif indicator == "cci":
+                        df.ta.cci(length=20, append=True)
+                        results[indicator] = {
+                            "value": float(df['CCI_20_0.015'].iloc[-1])
+                        }
+                        valid_indicators += 1
+                        
+                    elif indicator == "roc":
+                        df.ta.roc(length=12, append=True)
+                        results[indicator] = {
+                            "value": float(df['ROC_12'].iloc[-1])
+                        }
+                        valid_indicators += 1
+                        
+                    elif indicator == "willr":
+                        df.ta.willr(length=14, append=True)
+                        results[indicator] = {
+                            "value": float(df['WILLR_14'].iloc[-1])
+                        }
+                        valid_indicators += 1
+                        
+                    elif indicator == "ao":
+                        df.ta.ao(append=True)
+                        results[indicator] = {
+                            "value": float(df['AO_5_34'].iloc[-1])
+                        }
+                        valid_indicators += 1
+                    
+                    # Volatility Indicators
+                    elif indicator == "bbands":
+                        df.ta.bbands(length=5, append=True)
+                        results[indicator] = {
+                            "lower": float(df['BBL_5_2.0'].iloc[-1]),
+                            "middle": float(df['BBM_5_2.0'].iloc[-1]),
+                            "upper": float(df['BBU_5_2.0'].iloc[-1])
+                        }
+                        valid_indicators += 1
+                    
+                    elif indicator == "atr":
+                        df.ta.atr(length=14, append=True)
+                        results[indicator] = {
+                            "value": float(df['ATRr_14'].iloc[-1])
+                        }
+                        valid_indicators += 1
+                    
+                    elif indicator == "stddev":
+                        df.ta.stdev(length=20, append=True)
+                        results[indicator] = {
+                            "value": float(df['STDEV_20'].iloc[-1])
+                        }
+                        valid_indicators += 1
+                    
+                    # Additional Volatility Indicators
+                    elif indicator == "keltner":
+                        df.ta.kc(length=20, scalar=2, mamode="ema", append=True)
+                        results[indicator] = {
+                            "lower": float(df['KCLe_20_2'].iloc[-1]),
+                            "middle": float(df['KCBe_20_2'].iloc[-1]),
+                            "upper": float(df['KCUe_20_2'].iloc[-1])
+                        }
+                        valid_indicators += 1
+                        
+                    elif indicator == "donchian":
+                        df.ta.donchian(length=20, append=True)
+                        results[indicator] = {
+                            "lower": float(df['DCL_20_20'].iloc[-1]),
+                            "middle": float(df['DCM_20_20'].iloc[-1]),
+                            "upper": float(df['DCU_20_20'].iloc[-1])
+                        }
+                        valid_indicators += 1
+                        
+                    # Price Action Indicators
+                    elif indicator == "ichimoku":
+                        df.ta.ichimoku(append=True)
+                        results[indicator] = {
+                            "tenkan": float(df['ISA_9'].iloc[-1]),  # Conversion line
+                            "kijun": float(df['ISB_26'].iloc[-1]),  # Base line
+                            "senkou_a": float(df['ITS_9'].iloc[-1]), # Leading Span A
+                            "senkou_b": float(df['IKS_26'].iloc[-1]), # Leading Span B
+                            "chikou": float(df['ICS_26'].iloc[-1])  # Lagging Span
+                        }
+                        valid_indicators += 1
 
-            # Return None if we don't have enough valid indicators
-            if valid_indicators < MIN_REQUIRED_INDICATORS:
-                print(f"\nInsufficient valid indicators: {valid_indicators}")
-                return None
+                    elif indicator == "pivotpoints":
+                        # Calculate Pivot Points (Classic method)
+                        high = df['high'].iloc[-2]  # Previous period's high
+                        low = df['low'].iloc[-2]    # Previous period's low
+                        close = df['close'].iloc[-2] # Previous period's close
+                        
+                        pivot = (high + low + close) / 3
+                        r1 = (2 * pivot) - low
+                        r2 = pivot + (high - low)
+                        r3 = high + 2 * (pivot - low)
+                        s1 = (2 * pivot) - high
+                        s2 = pivot - (high - low)
+                        s3 = low - 2 * (high - pivot)
+                        
+                        results[indicator] = {
+                            "pivot": float(pivot),
+                            "r1": float(r1),
+                            "r2": float(r2),
+                            "r3": float(r3),
+                            "s1": float(s1),
+                            "s2": float(s2),
+                            "s3": float(s3)
+                        }
+                        valid_indicators += 1
 
-            return result
+                    elif indicator == "fibonacciretracement":
+                        # Calculate Fibonacci Retracement levels
+                        # Find recent high and low for retracement
+                        recent_high = df['high'].rolling(window=20).max().iloc[-1]
+                        recent_low = df['low'].rolling(window=20).min().iloc[-1]
+                        diff = recent_high - recent_low
+                        
+                        results[indicator] = {
+                            "trend": "up" if df['close'].iloc[-1] > df['close'].iloc[-20] else "down",
+                            "levels": {
+                                "0.0": float(recent_low),
+                                "0.236": float(recent_low + 0.236 * diff),
+                                "0.382": float(recent_low + 0.382 * diff),
+                                "0.5": float(recent_low + 0.5 * diff),
+                                "0.618": float(recent_low + 0.618 * diff),
+                                "0.786": float(recent_low + 0.786 * diff),
+                                "1.0": float(recent_high)
+                            }
+                        }
+                        valid_indicators += 1
 
+                    elif indicator == "candlepatterns":
+                        # Detect common candlestick patterns
+                        patterns = {}
+                        
+                        # Doji pattern
+                        doji_threshold = 0.1  # Maximum difference between open and close for doji
+                        latest_candle = df.iloc[-1]
+                        body = abs(latest_candle['open'] - latest_candle['close'])
+                        upper_shadow = latest_candle['high'] - max(latest_candle['open'], latest_candle['close'])
+                        lower_shadow = min(latest_candle['open'], latest_candle['close']) - latest_candle['low']
+                        avg_price = (latest_candle['high'] + latest_candle['low']) / 2
+                        
+                        patterns["doji"] = bool(body <= (avg_price * doji_threshold))
+                        
+                        # Hammer/Hanging Man
+                        body_to_shadow_ratio = 0.3
+                        is_hammer_shape = (body > 0) and (lower_shadow > (body / body_to_shadow_ratio)) and (upper_shadow < body)
+                        patterns["hammer"] = bool(is_hammer_shape and df['close'].iloc[-2] > df['close'].iloc[-1])
+                        patterns["hanging_man"] = bool(is_hammer_shape and df['close'].iloc[-2] < df['close'].iloc[-1])
+                        
+                        # Engulfing patterns
+                        prev_candle = df.iloc[-2]
+                        prev_body = abs(prev_candle['open'] - prev_candle['close'])
+                        is_bullish_engulfing = (latest_candle['close'] > latest_candle['open'] and 
+                                              prev_candle['close'] < prev_candle['open'] and
+                                              latest_candle['close'] > prev_candle['open'] and
+                                              latest_candle['open'] < prev_candle['close'])
+                        is_bearish_engulfing = (latest_candle['close'] < latest_candle['open'] and 
+                                              prev_candle['close'] > prev_candle['open'] and
+                                              latest_candle['close'] < prev_candle['open'] and
+                                              latest_candle['open'] > prev_candle['close'])
+                        
+                        patterns["bullish_engulfing"] = bool(is_bullish_engulfing)
+                        patterns["bearish_engulfing"] = bool(is_bearish_engulfing)
+                        
+                        results[indicator] = patterns
+                        valid_indicators += 1
+
+                    elif indicator == "harmonicpatterns":
+                        # Detect harmonic patterns (Gartley, Butterfly, Bat, Crab)
+                        # Using last 5 swing points
+                        swings = []
+                        direction = 1  # 1 for up, -1 for down
+                        
+                        # Find swing points
+                        for i in range(len(df)-3):
+                            if direction == 1:  # Looking for high
+                                if df['high'].iloc[i+1] > df['high'].iloc[i] and df['high'].iloc[i+1] > df['high'].iloc[i+2]:
+                                    swings.append({"price": df['high'].iloc[i+1], "type": "high"})
+                                    direction = -1
+                            else:  # Looking for low
+                                if df['low'].iloc[i+1] < df['low'].iloc[i] and df['low'].iloc[i+1] < df['low'].iloc[i+2]:
+                                    swings.append({"price": df['low'].iloc[i+1], "type": "low"})
+                                    direction = 1
+                            
+                            if len(swings) >= 5:
+                                break
+                        
+                        # Calculate retracement ratios if we have enough swing points
+                        patterns = {}
+                        if len(swings) >= 5:
+                            # XA, AB, BC, CD moves
+                            moves = []
+                            for i in range(len(swings)-1):
+                                moves.append(abs(swings[i+1]["price"] - swings[i]["price"]))
+                            
+                            # Calculate ratios
+                            if len(moves) >= 4:
+                                ab_xa = moves[1] / moves[0] if moves[0] != 0 else 0
+                                bc_ab = moves[2] / moves[1] if moves[1] != 0 else 0
+                                cd_bc = moves[3] / moves[2] if moves[2] != 0 else 0
+                                
+                                # Gartley Pattern
+                                patterns["gartley"] = {
+                                    "valid": bool(
+                                        0.618 <= ab_xa <= 0.618 and
+                                        0.382 <= bc_ab <= 0.886 and
+                                        1.27 <= cd_bc <= 1.618
+                                    ),
+                                    "completion": float(df['close'].iloc[-1])
+                                }
+                                
+                                # Butterfly Pattern
+                                patterns["butterfly"] = {
+                                    "valid": bool(
+                                        0.786 <= ab_xa <= 0.786 and
+                                        0.382 <= bc_ab <= 0.886 and
+                                        1.618 <= cd_bc <= 2.618
+                                    ),
+                                    "completion": float(df['close'].iloc[-1])
+                                }
+                        
+                        results[indicator] = patterns
+                        valid_indicators += 1
+
+                    elif indicator == "pricelevels":
+                        # Calculate key price levels and support/resistance
+                        window = 20  # Look back period
+                        
+                        # Find potential support levels (recent lows)
+                        lows = df['low'].rolling(window=5).min()
+                        support_levels = set()
+                        for i in range(len(df)-window, len(df)):
+                            if lows.iloc[i] == df['low'].iloc[i]:
+                                support_levels.add(round(float(df['low'].iloc[i]), 2))
+                        
+                        # Find potential resistance levels (recent highs)
+                        highs = df['high'].rolling(window=5).max()
+                        resistance_levels = set()
+                        for i in range(len(df)-window, len(df)):
+                            if highs.iloc[i] == df['high'].iloc[i]:
+                                resistance_levels.add(round(float(df['high'].iloc[i]), 2))
+                        
+                        # Calculate volume profile
+                        price_volume = {}
+                        for i in range(len(df)-window, len(df)):
+                            price = round(df['close'].iloc[i], 2)
+                            volume = df['volume'].iloc[i]
+                            if price in price_volume:
+                                price_volume[price] += volume
+                            else:
+                                price_volume[price] = volume
+                        
+                        # Find high volume nodes
+                        sorted_prices = sorted(price_volume.items(), key=lambda x: x[1], reverse=True)
+                        high_volume_levels = [float(price) for price, _ in sorted_prices[:3]]
+                        
+                        results[indicator] = {
+                            "support_levels": list(sorted(support_levels))[:3],
+                            "resistance_levels": list(sorted(resistance_levels))[:3],
+                            "high_volume_levels": high_volume_levels,
+                            "current_price": float(df['close'].iloc[-1])
+                        }
+                    valid_indicators += 1
+                    
+                except Exception as e:
+                    print(f"Error calculating {indicator}: {str(e)}")
+                    continue
+            
+            # Store DataFrame for potential chart generation
+            self._current_df = df
+            
+            return results if valid_indicators >= MIN_REQUIRED_INDICATORS else None
+            
         except Exception as e:
-            raise HTTPException(
-                status_code=500, detail=f"Error fetching indicators: {str(e)}"
-            )
+            print(f"Error in _fetch_indicators: {str(e)}")
+            print("Stack trace:")
+            import traceback
+            traceback.print_exc()
+            return None
 
     def format_indicators_json(self, indicators: Dict[str, Any]) -> Dict[str, Any]:
         """Format raw indicator data into a structured JSON format.
@@ -702,44 +1567,8 @@ IMPORTANT: Respond with ONLY the raw JSON object. Do not include markdown format
         self, indicators: Dict[str, Any], symbol: str, timeframe: str, 
         user_prompt: str, system_prompt: Optional[str] = None,
         strategy_type: str = DEFAULT_STRATEGY, analysis_focus: List[str] = None
-    ) -> Dict[str, Any]:
-        """Generate a comprehensive technical analysis using GPT-4.
-
-        This method combines technical indicator data with natural language processing
-        to generate detailed market analysis. It considers:
-        - Multiple timeframe perspectives
-        - Trading strategy context
-        - User's specific analysis requirements
-        - Risk management considerations
-
-        Args:
-            indicators (Dict[str, Any]): Technical indicator data
-            symbol (str): Trading pair being analyzed
-            timeframe (str): Analysis timeframe
-            user_prompt (str): Original user's analysis request
-            system_prompt (Optional[str]): Custom system prompt for GPT
-            strategy_type (str, optional): Trading strategy focus. Defaults to DEFAULT_STRATEGY
-            analysis_focus (List[str], optional): Specific areas to analyze
-
-        Returns:
-            Dict[str, Any]: Analysis results containing:
-                - response: Generated analysis text
-                - metadata: Analysis context and parameters used
-
-        Raises:
-            HTTPException: If there's an error generating the analysis
-
-        Example:
-            >>> generate_analysis(indicators_data, "BTC/USDT", "4h", "Analyze BTC trend")
-            {
-                "response": "Detailed market analysis...",
-                "metadata": {
-                    "token": "BTC",
-                    "timeframe": "4h",
-                    ...
-                }
-            }
-        """
+    ) -> str:
+        """Generate a comprehensive technical analysis using GPT-4."""
         try:
             time_horizon = INTERVAL_HORIZONS.get(timeframe, "medium-term")
             
@@ -750,33 +1579,27 @@ IMPORTANT: Respond with ONLY the raw JSON object. Do not include markdown format
             formatted_indicators = json.dumps(indicators, indent=2)
             
             analysis_request = f"""ANALYSIS CONTEXT:
-- Asset: {symbol}
+- Asset: {symbol} (USD)
 - Timeframe: {timeframe} ({time_horizon})
 - Strategy Focus: {strategy_type if strategy_type else 'Not specified'}
 - Analysis Areas: {', '.join(analysis_focus) if analysis_focus else 'All available indicators'}
 - Original Question: "{user_prompt}"
 
-Guidelines for this analysis:
-- Start by directly addressing the original question using the most relevant indicators
-- Explain what the indicators are telling us about the market in clear, actionable terms
-- Highlight important signals or patterns you observe
-- Include specific price levels and clear rules when relevant
-- If you spot potential trade setups, describe them naturally including:
-  * Entry conditions and price levels
-  * Stop loss placement and reasoning
-  * Take profit targets
-  * Position sizing suggestions
-  * Risk management considerations
-- Feel free to point out any limitations or additional context needed
-- You don't need to follow a rigid structure - let the analysis flow based on what's most important for answering the original question
-
-Consider the time horizon of {time_horizon} when providing your analysis.
+REQUIREMENTS:
+1. Start your analysis by explicitly mentioning the Asset and the timeframe. 
+2. Answer the question directly and concisely, reference the explicitly requested indicators.
+2. Always include:
+   - Entry levels (with specific price targets)
+   - Stop loss levels
+   - Take profit targets
+   - Key support/resistance levels if relevant
+3. Explain which indicators support your analysis in natural language. Be opinionated and concise.
 
 Here are the technical indicators for {symbol} on the {timeframe} timeframe:
 
 {formatted_indicators}
 
-Please analyze these indicators in the context of the original question."""
+Please analyze these indicators in the context of the original question, ensuring to include all required elements."""
             
             messages = [
                 {"role": "system", "content": system_prompt},
@@ -790,22 +1613,7 @@ Please analyze these indicators in the context of the original question."""
                 max_tokens=1500
             )
 
-            # Return analysis with metadata
-            return {
-                "response": response.choices[0].message.content,
-                "metadata": {
-                    "prompt": user_prompt,
-                    "token": symbol.split('/')[0],
-                    "pair": symbol,
-                    "interval": timeframe,
-                    "strategy_type": strategy_type,
-                    "analysis_focus": analysis_focus,
-                    "selected_indicators": list(self._get_selected_indicators(indicators)),
-                    "timestamp": datetime.now().isoformat(),
-                    "data_quality": "full",
-                    "technical_indicators": indicators
-                }
-            }
+            return response.choices[0].message.content
 
         except Exception as e:
             raise HTTPException(
@@ -827,6 +1635,36 @@ Please analyze these indicators in the context of the original question."""
                 selected.add(key)
         
         return selected
+
+    def _get_fallback_symbols(self) -> List[str]:
+        """Provide a fallback list of common coins.
+
+        Returns:
+            List[str]: List of common cryptocurrency symbols
+        """
+        print("\nUsing fallback symbol list")
+        return [
+            "BTC",
+            "ETH",
+            "BNB",
+            "SOL",
+            "XRP",
+            "ADA",
+            "DOGE",
+            "MATIC",
+            "DOT",
+            "LTC",
+            "AVAX",
+            "LINK",
+            "UNI",
+            "ATOM",
+            "ETC",
+            "XLM",
+            "ALGO",
+            "NEAR",
+            "FTM",
+            "SAND"
+        ]
 
 
 def main():
@@ -860,5 +1698,309 @@ def main():
         print(json.dumps(result, indent=2))
         print("\n" + "=" * 80 + "\n")
 
+
+def test_indicators():
+    """Test all technical indicators using BTC data."""
+    print("\nRunning Technical Indicator Tests for BTC")
+    print("=" * 80)
+    
+    ta_tool = TechnicalAnalysis()
+    
+    try:
+        # Fetch BTC candle data
+        print("\n1. Fetching BTC Candle Data...")
+        candle_data = ta_tool.fetch_candle_data("BTC", "1h")
+        if not candle_data:
+            print("❌ Failed to fetch candle data")
+            return
+            
+        # Convert to DataFrame
+        df = pd.DataFrame(candle_data)
+        df['datetime'] = pd.to_datetime(df['time'], unit='s')
+        df.set_index('datetime', inplace=True)
+        df.sort_index(inplace=True)
+        
+        print(f"✓ Successfully fetched {len(df)} candles")
+        
+        # Test each indicator category
+        print("\n2. Testing Moving Averages...")
+        try:
+            # SMA
+            df.ta.sma(length=20, append=True)
+            print("✓ SMA_20:", float(df['SMA_20'].iloc[-1]))
+            
+            # EMA
+            df.ta.ema(length=20, append=True)
+            print("✓ EMA_20:", float(df['EMA_20'].iloc[-1]))
+            
+            # DEMA
+            df.ta.dema(length=20, append=True)
+            print("✓ DEMA_20:", float(df['DEMA_20'].iloc[-1]))
+            
+            # TEMA
+            df.ta.tema(length=20, append=True)
+            print("✓ TEMA_20:", float(df['TEMA_20'].iloc[-1]))
+            
+            # VWMA
+            df.ta.vwma(length=20, append=True)
+            print("✓ VWMA_20:", float(df['VWMA_20'].iloc[-1]))
+            
+            # WMA (New)
+            df.ta.wma(length=20, append=True)
+            print("✓ WMA_20:", float(df['WMA_20'].iloc[-1]))
+            
+            # HMA (New)
+            df.ta.hma(length=20, append=True)
+            print("✓ HMA_20:", float(df['HMA_20'].iloc[-1]))
+        except Exception as e:
+            print(f"❌ Error in Moving Averages: {str(e)}")
+        
+        print("\n3. Testing Trend Indicators...")
+        try:
+            # ADX
+            df.ta.adx(append=True)
+            print("✓ ADX_14:", float(df['ADX_14'].iloc[-1]))
+            
+            # Supertrend
+            df.ta.supertrend(append=True)
+            print("✓ Supertrend:", float(df['SUPERT_7_3.0'].iloc[-1]))
+            
+            # PSAR (New)
+            df.ta.psar(append=True)
+            print("✓ PSAR:", float(df['PSARl_0.02_0.2'].iloc[-1]))
+            
+            # TRIX (New)
+            df.ta.trix(length=20, append=True)
+            print("✓ TRIX:", float(df['TRIX_20_9'].iloc[-1]))
+            
+            # KST (New)
+            df.ta.kst(append=True)
+            print("✓ KST:", float(df['KST_10_15_20_30_10_10_10_15'].iloc[-1]))
+        except Exception as e:
+            print(f"❌ Error in Trend Indicators: {str(e)}")
+        
+        print("\n4. Testing Momentum Indicators...")
+        try:
+            # RSI
+            df.ta.rsi(length=14, append=True)
+            print("✓ RSI_14:", float(df['RSI_14'].iloc[-1]))
+            
+            # MACD
+            df.ta.macd(append=True)
+            print("✓ MACD:", float(df['MACD_12_26_9'].iloc[-1]))
+            
+            # Stochastic
+            df.ta.stoch(append=True)
+            print("✓ Stoch_K:", float(df['STOCHk_14_3_3'].iloc[-1]))
+            print("✓ Stoch_D:", float(df['STOCHd_14_3_3'].iloc[-1]))
+            
+            # CCI (New)
+            df.ta.cci(length=20, append=True)
+            print("✓ CCI:", float(df['CCI_20_0.015'].iloc[-1]))
+            
+            # ROC (New)
+            df.ta.roc(length=12, append=True)
+            print("✓ ROC:", float(df['ROC_12'].iloc[-1]))
+            
+            # Williams %R (New)
+            df.ta.willr(length=14, append=True)
+            print("✓ Williams %R:", float(df['WILLR_14'].iloc[-1]))
+            
+            # Awesome Oscillator (New)
+            df.ta.ao(append=True)
+            print("✓ AO:", float(df['AO_5_34'].iloc[-1]))
+        except Exception as e:
+            print(f"❌ Error in Momentum Indicators: {str(e)}")
+        
+        print("\n5. Testing Volume Indicators...")
+        try:
+            # Volume SMA
+            volume_sma = df['volume'].rolling(window=20).mean()
+            print("✓ Volume SMA:", float(volume_sma.iloc[-1]))
+            
+            # OBV
+            df.ta.obv(append=True)
+            print("✓ OBV:", float(df['OBV'].iloc[-1]))
+            
+            # CMF
+            df.ta.cmf(append=True)
+            print("✓ CMF:", float(df['CMF_20'].iloc[-1]))
+            
+            # VWAP (New)
+            df.ta.vwap(append=True)
+            print("✓ VWAP:", float(df['VWAP_D'].iloc[-1]))
+            
+            # PVT (New)
+            df.ta.pvt(append=True)
+            print("✓ PVT:", float(df['PVT'].iloc[-1]))
+            
+            # MFI (New)
+            df['volume'] = df['volume'].fillna(0).astype('int64')  # Handle NaN values before conversion
+            df.ta.mfi(length=14, append=True)
+            print("✓ MFI:", float(df['MFI_14'].iloc[-1]))
+        except Exception as e:
+            print(f"❌ Error in Volume Indicators: {str(e)}")
+        
+        print("\n6. Testing Volatility Indicators...")
+        try:
+            # Bollinger Bands
+            df.ta.bbands(length=20, append=True)
+            print("✓ BB Upper:", float(df['BBU_20_2.0'].iloc[-1]))
+            print("✓ BB Middle:", float(df['BBM_20_2.0'].iloc[-1]))
+            print("✓ BB Lower:", float(df['BBL_20_2.0'].iloc[-1]))
+            
+            # ATR
+            df.ta.atr(length=14, append=True)
+            print("✓ ATR:", float(df['ATRr_14'].iloc[-1]))
+            
+            # Standard Deviation
+            df.ta.stdev(length=20, append=True)
+            print("✓ StdDev:", float(df['STDEV_20'].iloc[-1]))
+            
+            # Keltner Channels (New)
+            df.ta.kc(length=20, scalar=2, mamode="ema", append=True)
+            print("✓ KC Upper:", float(df['KCUe_20_2.0'].iloc[-1]))
+            print("✓ KC Middle:", float(df['KCBe_20_2.0'].iloc[-1]))
+            print("✓ KC Lower:", float(df['KCLe_20_2.0'].iloc[-1]))
+            
+            # Donchian Channels (New)
+            df.ta.donchian(length=20, append=True)
+            print("✓ DC Upper:", float(df['DCU_20_20'].iloc[-1]))
+            print("✓ DC Middle:", float(df['DCM_20_20'].iloc[-1]))
+            print("✓ DC Lower:", float(df['DCL_20_20'].iloc[-1]))
+        except Exception as e:
+            print(f"❌ Error in Volatility Indicators: {str(e)}")
+            
+        print("\n7. Testing Price Action Indicators...")
+        try:
+            # Ichimoku Cloud
+            df.ta.ichimoku(append=True)
+            print("✓ Ichimoku Tenkan:", float(df['ISA_9'].iloc[-1]))
+            print("✓ Ichimoku Kijun:", float(df['ISB_26'].iloc[-1]))
+            print("✓ Ichimoku Senkou A:", float(df['ITS_9'].iloc[-1]))
+            print("✓ Ichimoku Senkou B:", float(df['IKS_26'].iloc[-1]))
+
+            # Pivot Points
+            high = df['high'].iloc[-2]
+            low = df['low'].iloc[-2]
+            close = df['close'].iloc[-2]
+            pivot = (high + low + close) / 3
+            print("✓ Pivot Point:", float(pivot))
+            print("✓ R1:", float((2 * pivot) - low))
+            print("✓ S1:", float((2 * pivot) - high))
+
+            # Fibonacci Retracement
+            recent_high = df['high'].rolling(window=20).max().iloc[-1]
+            recent_low = df['low'].rolling(window=20).min().iloc[-1]
+            diff = recent_high - recent_low
+            print("✓ Fibonacci 0.618:", float(recent_low + 0.618 * diff))
+            print("✓ Fibonacci 0.5:", float(recent_low + 0.5 * diff))
+            print("✓ Fibonacci 0.382:", float(recent_low + 0.382 * diff))
+
+            # Candlestick Patterns
+            latest_candle = df.iloc[-1]
+            prev_candle = df.iloc[-2]
+            body = abs(latest_candle['open'] - latest_candle['close'])
+            upper_shadow = latest_candle['high'] - max(latest_candle['open'], latest_candle['close'])
+            lower_shadow = min(latest_candle['open'], latest_candle['close']) - latest_candle['low']
+            avg_price = (latest_candle['high'] + latest_candle['low']) / 2
+            
+            # Doji pattern check
+            doji_threshold = 0.1
+            is_doji = bool(body <= (avg_price * doji_threshold))
+            print("✓ Doji Pattern Present:", is_doji)
+            
+            # Hammer pattern check
+            body_to_shadow_ratio = 0.3
+            is_hammer = bool((body > 0) and (lower_shadow > (body / body_to_shadow_ratio)) and (upper_shadow < body))
+            print("✓ Hammer Pattern Present:", is_hammer)
+
+            # Harmonic Patterns
+            # Find swing points
+            swings = []
+            direction = 1
+            for i in range(len(df)-3):
+                if direction == 1 and df['high'].iloc[i+1] > df['high'].iloc[i] and df['high'].iloc[i+1] > df['high'].iloc[i+2]:
+                    swings.append({"price": df['high'].iloc[i+1], "type": "high"})
+                    direction = -1
+                elif direction == -1 and df['low'].iloc[i+1] < df['low'].iloc[i] and df['low'].iloc[i+1] < df['low'].iloc[i+2]:
+                    swings.append({"price": df['low'].iloc[i+1], "type": "low"})
+                    direction = 1
+                if len(swings) >= 5:
+                    break
+            print("✓ Identified Swing Points:", len(swings))
+
+            # Price Levels
+            window = 20
+            # Support levels
+            lows = df['low'].rolling(window=5).min()
+            support_levels = set()
+            for i in range(len(df)-window, len(df)):
+                if lows.iloc[i] == df['low'].iloc[i]:
+                    support_levels.add(round(float(df['low'].iloc[i]), 2))
+            print("✓ Support Levels Found:", len(support_levels))
+
+            # Resistance levels
+            highs = df['high'].rolling(window=5).max()
+            resistance_levels = set()
+            for i in range(len(df)-window, len(df)):
+                if highs.iloc[i] == df['high'].iloc[i]:
+                    resistance_levels.add(round(float(df['high'].iloc[i]), 2))
+            print("✓ Resistance Levels Found:", len(resistance_levels))
+
+            # Volume Profile
+            price_volume = {}
+            for i in range(len(df)-window, len(df)):
+                price = round(df['close'].iloc[i], 2)
+                volume = df['volume'].iloc[i]
+                if price in price_volume:
+                    price_volume[price] += volume
+                else:
+                    price_volume[price] = volume
+            sorted_prices = sorted(price_volume.items(), key=lambda x: x[1], reverse=True)
+            high_volume_levels = [float(price) for price, _ in sorted_prices[:3]]
+            print("✓ High Volume Nodes Found:", len(high_volume_levels))
+
+        except Exception as e:
+            print(f"❌ Error in Price Action Indicators: {str(e)}")
+            import traceback
+            traceback.print_exc()
+
+        # Print DataFrame info
+        print("\n8. Testing DataFrame Structure...")
+        print("\nDataFrame Info:")
+        print(df.info())
+        print("\nAvailable Columns:")
+        print(df.columns.tolist())
+        
+        print("\nTest Complete!")
+        
+    except Exception as e:
+        print(f"\n❌ Test failed with error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+
 if __name__ == "__main__":
-    main()
+    import sys
+    
+    if len(sys.argv) > 1 and sys.argv[1] == "test":
+        test_indicators()
+    elif len(sys.argv) > 1:
+        # Use the command line argument as the prompt
+        prompt = sys.argv[1]
+        try:
+            ta_tool = TechnicalAnalysis()
+            result = ta_tool.run(prompt)
+            print("\nANALYSIS RESULTS:")
+            print("=" * 80)
+            if "error" in result:
+                print(f"Error: {result['error']}")
+            else:
+                print(result["response"])
+                print("\nMETADATA:")
+                print("=" * 80)
+                print(json.dumps(result["metadata"], indent=2))
+        except Exception as e:
+            print(f"Error: {str(e)}")
+    else:
+        print("Please provide an analysis prompt as a command line argument")
