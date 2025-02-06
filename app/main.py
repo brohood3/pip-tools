@@ -1,6 +1,8 @@
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, StreamingResponse
+from io import BytesIO
+import base64
 
 from app.models.api import PromptRequest, ToolSelectorRequest
 from app.tools.helpers import TOOLS, TOOL_TO_MODULE
@@ -58,7 +60,7 @@ async def run_tool_selector(request: ToolSelectorRequest):
     return {"result": result}
 
 @app.post("/{tool_name}")
-async def run_tool(tool_name: str, request: PromptRequest):
+async def run_tool(tool_name: str, prompt_request: PromptRequest, request: Request):
     """Generic endpoint for all other tools"""
     # Case-insensitive lookup
     tool_name_lower = tool_name.lower()
@@ -68,5 +70,53 @@ async def run_tool(tool_name: str, request: PromptRequest):
         raise ToolNotFoundError(tool_name)
 
     tool = available_tools[tool_name_lower]
-    result = tool.run(request.prompt, request.system_prompt)
-    return {"result": result}
+    result = tool.run(prompt_request.prompt, prompt_request.system_prompt)
+    
+    # Handle chart data for technical analysis tool
+    if tool_name_lower == "technical_analysis" and "chart" in result:
+        chart_data = result.pop("chart")  # Remove chart from main response
+        if chart_data:  # Only add chart_url if we actually have a chart
+            base_url = str(request.base_url).rstrip('/')
+            result["chart_url"] = f"{base_url}/chart/latest"  # Full URL
+    
+    return result  # Return the raw result
+
+@app.get("/chart/latest")
+async def get_latest_chart():
+    """Serve the latest generated chart image."""
+    try:
+        # Get the technical analysis tool
+        tool = TOOL_TO_MODULE.get("technical_analysis")
+        if not tool:
+            raise HTTPException(status_code=500, detail="Technical analysis tool not available")
+            
+        # Get the latest chart
+        chart_data = tool.get_latest_chart()
+        if not chart_data:
+            raise HTTPException(status_code=404, detail="No chart available")
+            
+        # Remove the data URI prefix if present
+        if "base64," in chart_data:
+            chart_data = chart_data.split("base64,")[1]
+            
+        # Convert base64 to bytes
+        try:
+            image_bytes = base64.b64decode(chart_data)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail="Invalid chart data")
+        
+        # Return the image with caching headers
+        headers = {
+            "Cache-Control": "public, max-age=300",  # Cache for 5 minutes
+            "ETag": str(hash(chart_data))  # Add ETag for caching
+        }
+        
+        return StreamingResponse(
+            BytesIO(image_bytes), 
+            media_type="image/png",
+            headers=headers
+        )
+        
+    except Exception as e:
+        logger.exception("Error serving chart")
+        raise HTTPException(status_code=500, detail=str(e))

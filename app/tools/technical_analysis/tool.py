@@ -555,6 +555,9 @@ class TechnicalAnalysis:
         indicator_registry (IndicatorRegistry): Registry of available technical indicators
     """
 
+    # Class-level variable to store the latest chart
+    _latest_chart = None
+
     def __init__(self):
         """Initialize the TechnicalAnalysis tool with API clients and configuration.
         
@@ -580,6 +583,16 @@ class TechnicalAnalysis:
         
         # Initialize chart generator
         self.chart_generator = ChartGenerator()
+
+    @classmethod
+    def get_latest_chart(cls) -> Optional[str]:
+        """Get the latest generated chart."""
+        return cls._latest_chart
+
+    @classmethod
+    def _store_chart(cls, chart_data: str):
+        """Store the latest generated chart."""
+        cls._latest_chart = chart_data
 
     def get_lunarcrush_coin_id(self, symbol: str) -> Optional[int]:
         """Get coin ID from LunarCrush API."""
@@ -771,8 +784,10 @@ class TechnicalAnalysis:
                     indicators,
                     symbol,
                     analysis_params["timeframe"],
-                    analysis_type=analysis_params["strategy_type"]  # Added strategy_type as analysis_type
+                    analysis_type=analysis_params["strategy_type"]
                 )
+                # Store the chart for later retrieval
+                self._store_chart(chart_base64)
 
             # Store all context in metadata
             metadata = {
@@ -788,13 +803,15 @@ class TechnicalAnalysis:
                 "technical_indicators": self.format_indicators_json(indicators)
             }
 
+            # Return the response in the format expected by main.py
             return {
-                "response": analysis, 
+                "response": analysis,
                 "metadata": metadata,
-                "chart": chart_base64
+                "chart": chart_base64  # This will be handled by main.py
             }
 
         except Exception as e:
+            print(f"Error in technical analysis: {str(e)}")
             return {"error": str(e)}
 
     def parse_prompt_with_llm(self, prompt: str) -> PromptAnalysis:
@@ -1997,6 +2014,11 @@ def test_indicators():
         print(f"\n❌ Test failed with error: {str(e)}")
         import traceback
         traceback.print_exc()
+
+def get_latest_chart() -> Optional[str]:
+    """Get the latest generated chart from the singleton instance."""
+    ta = get_ta_instance()
+    return ta.get_latest_chart()
 
 if __name__ == "__main__":
     import sys
