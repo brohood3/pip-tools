@@ -29,6 +29,7 @@ from io import BytesIO
 import base64
 from dataclasses import dataclass
 from enum import Enum
+from .chart_generator import ChartGenerator
 
 # Load environment variables
 load_dotenv()
@@ -369,9 +370,10 @@ class IndicatorRegistry:
                 IndicatorCategory.VOLUME,
                 IndicatorCategory.PRICE_ACTION
             ],
-            "scalping": [
+            "volatility": [  # Changed from "scalping" to "volatility"
+                IndicatorCategory.VOLATILITY,
                 IndicatorCategory.MOMENTUM,
-                IndicatorCategory.VOLATILITY
+                IndicatorCategory.PRICE_ACTION
             ]
         }
 
@@ -380,7 +382,7 @@ class IndicatorRegistry:
         return [
             {"indicator": ind.name, **ind.params}
             for ind in self._indicators.values()
-            if ind.priority == 1
+            if ind.priority == 1 or ind.name == "pricelevels"  # Always include pricelevels
         ]
 
     def get_indicators_by_category(self, category: IndicatorCategory) -> List[Dict[str, Any]]:
@@ -575,6 +577,9 @@ class TechnicalAnalysis:
         
         # Cache for coin IDs to reduce API calls
         self._coin_id_cache = {}
+        
+        # Initialize chart generator
+        self.chart_generator = ChartGenerator()
 
     def get_lunarcrush_coin_id(self, symbol: str) -> Optional[int]:
         """Get coin ID from LunarCrush API."""
@@ -612,7 +617,7 @@ class TechnicalAnalysis:
             print(f"Error getting coin ID: {str(e)}")
             return None
 
-    def fetch_candle_data(self, symbol: str, interval: str, limit: int = 200) -> List[Dict[str, Any]]:
+    def fetch_candle_data(self, symbol: str, interval: str, limit: int = 300) -> List[Dict[str, Any]]:
         """Fetch historical candle data from LunarCrush API."""
         try:
             coin_id = self.get_lunarcrush_coin_id(symbol)
@@ -758,6 +763,17 @@ class TechnicalAnalysis:
                 analysis_focus=analysis_params["analysis_focus"]
             )
 
+            # Generate chart if we have valid indicators
+            chart_base64 = ""
+            if self._current_df is not None and indicators:
+                chart_base64 = self.chart_generator.generate_chart(
+                    self._current_df,
+                    indicators,
+                    symbol,
+                    analysis_params["timeframe"],
+                    analysis_type=analysis_params["strategy_type"]  # Added strategy_type as analysis_type
+                )
+
             # Store all context in metadata
             metadata = {
                 "prompt": prompt,
@@ -772,7 +788,11 @@ class TechnicalAnalysis:
                 "technical_indicators": self.format_indicators_json(indicators)
             }
 
-            return {"response": analysis, "metadata": metadata}
+            return {
+                "response": analysis, 
+                "metadata": metadata,
+                "chart": chart_base64
+            }
 
         except Exception as e:
             return {"error": str(e)}
@@ -849,7 +869,7 @@ Strategy Types:
 - momentum
 - mean_reversion
 - breakout
-- scalping
+- volatility
 - swing_trading
 - pattern_trading
 - volatility_trading
@@ -878,7 +898,7 @@ Output: {{
     "token": "NEAR",
     "timeframe": "5m",
     "indicators": ["bbands", "atr", "stoch", "volume", "mfi"],
-    "strategy_type": "scalping",
+    "strategy_type": "volatility",
     "analysis_focus": ["volatility", "momentum", "price_action"]
 }}
 
@@ -1007,9 +1027,9 @@ IMPORTANT: Respond with ONLY the raw JSON object. Do not include markdown format
             if selected_indicators:
                 all_indicators.update(selected_indicators)
             
-            # 2. Add base indicators (priority 1)
+            # 2. Add base indicators (priority 1) and pricelevels
             base_indicators = {ind.name for ind in self.indicator_registry._indicators.values() 
-                             if ind.priority == 1}
+                             if ind.priority == 1 or ind.name == "pricelevels"}  # Always include pricelevels
             all_indicators.update(base_indicators)
             
             # 3. Add strategy-specific indicators
@@ -1430,50 +1450,64 @@ IMPORTANT: Respond with ONLY the raw JSON object. Do not include markdown format
 
                     elif indicator == "pricelevels":
                         # Calculate key price levels and support/resistance
-                        window = 20  # Look back period
+                        window = len(df)  # Use entire dataset
+                        current_price = float(df['close'].iloc[-1])
+                        
+                        # Calculate minimum distance threshold (1% of current price)
+                        min_distance = current_price * 0.01
                         
                         # Find potential support levels (recent lows)
-                        lows = df['low'].rolling(window=5).min()
+                        lows = df['low'].rolling(window=50).min()  # Increased from 5 to 50 periods
                         support_levels = set()
                         for i in range(len(df)-window, len(df)):
-                            if lows.iloc[i] == df['low'].iloc[i]:
-                                support_levels.add(round(float(df['low'].iloc[i]), 2))
+                            price = round(float(df['low'].iloc[i]), 2)
+                            # Only add if it's a valid support level (below current price and not too close)
+                            if (lows.iloc[i] == df['low'].iloc[i] and 
+                                price < current_price and 
+                                (current_price - price) > min_distance):
+                                support_levels.add(price)
                         
                         # Find potential resistance levels (recent highs)
-                        highs = df['high'].rolling(window=5).max()
+                        highs = df['high'].rolling(window=50).max()  # Increased from 5 to 50 periods
                         resistance_levels = set()
                         for i in range(len(df)-window, len(df)):
-                            if highs.iloc[i] == df['high'].iloc[i]:
-                                resistance_levels.add(round(float(df['high'].iloc[i]), 2))
+                            price = round(float(df['high'].iloc[i]), 2)
+                            # Only add if it's a valid resistance level (above current price and not too close)
+                            if (highs.iloc[i] == df['high'].iloc[i] and 
+                                price > current_price and 
+                                (price - current_price) > min_distance):
+                                resistance_levels.add(price)
+
+                        # Calculate high volume levels
+                        volume_weighted_levels = []
+                        price_range = df['high'].max() - df['low'].min()
+                        bin_size = price_range / 200  # 200 bins for granularity
                         
-                        # Calculate volume profile
-                        price_volume = {}
-                        for i in range(len(df)-window, len(df)):
-                            price = round(df['close'].iloc[i], 2)
-                            volume = df['volume'].iloc[i]
-                            if price in price_volume:
-                                price_volume[price] += volume
-                            else:
-                                price_volume[price] = volume
+                        for i in range(200):
+                            price_level = df['low'].min() + bin_size * i
+                            mask = (df['low'] <= price_level + bin_size*1.5) & (df['high'] >= price_level - bin_size*1.5)
+                            volume_at_level = df[mask]['volume'].sum()
+                            volume_weighted_levels.append((price_level, volume_at_level))
                         
-                        # Find high volume nodes
-                        sorted_prices = sorted(price_volume.items(), key=lambda x: x[1], reverse=True)
-                        high_volume_levels = [float(price) for price, _ in sorted_prices[:3]]
+                        # Sort by volume and get top levels
+                        volume_weighted_levels.sort(key=lambda x: x[1], reverse=True)
+                        high_volume_levels = [level[0] for level in volume_weighted_levels[:10]]  # Take top 10 volume levels
                         
+                        # Store results with more levels
                         results[indicator] = {
-                            "support_levels": list(sorted(support_levels))[:3],
-                            "resistance_levels": list(sorted(resistance_levels))[:3],
+                            "support_levels": list(sorted(support_levels))[:6],  # Take first 6 support levels
+                            "resistance_levels": list(sorted(resistance_levels))[:6],  # Take first 6 resistance levels
                             "high_volume_levels": high_volume_levels,
-                            "current_price": float(df['close'].iloc[-1])
+                            "current_price": current_price
                         }
-                    valid_indicators += 1
+                        valid_indicators += 1
                     
                 except Exception as e:
                     print(f"Error calculating {indicator}: {str(e)}")
                     continue
             
             # Store DataFrame for potential chart generation
-            self._current_df = df
+            self._current_df = df.iloc[-100:]  # Slice for charting
             
             return results if valid_indicators >= MIN_REQUIRED_INDICATORS else None
             
@@ -1563,33 +1597,27 @@ IMPORTANT: Respond with ONLY the raw JSON object. Do not include markdown format
             time_horizon = INTERVAL_HORIZONS.get(timeframe, "medium-term")
             
             if not system_prompt:
-                system_prompt = """You are an expert technical analyst. Your goal is to provide clear, actionable insights that directly answer the user's question while explaining what the technical indicators reveal about the market. Focus on being clear and natural in your explanations, avoiding rigid structures unless they serve the analysis."""
+                system_prompt = """You are an expert technical analyst with a comprehensive view of market structure. Your goal is to provide clear, actionable insights that cover both immediate trading opportunities and longer-term price targets. When analyzing support and resistance levels: 1. ALWAYS mention both near-term and far-term levels 2. Include multiple take-profit targets at key resistance/support zones 3. Don't be overly conservative - if there are significant levels far from current price, include them 4. Explain your rationale for both conservative and aggressive targets Focus on being clear and natural in your explanations, avoiding rigid structures unless they serve the analysis."""
 
             # Format indicators for better readability
             formatted_indicators = json.dumps(indicators, indent=2)
+            print("\nDebug - Indicators being passed to LLM:")
+            print(formatted_indicators)
             
-            analysis_request = f"""ANALYSIS CONTEXT:
-- Asset: {symbol} (USD)
-- Timeframe: {timeframe} ({time_horizon})
-- Strategy Focus: {strategy_type if strategy_type else 'Not specified'}
-- Analysis Areas: {', '.join(analysis_focus) if analysis_focus else 'All available indicators'}
-- Original Question: "{user_prompt}"
+            analysis_request = f"""I need your expert analysis on {symbol} (USD) on the {timeframe} timeframe, which typically suits {time_horizon} trading horizons. The user's original question was: "{user_prompt}"
 
-REQUIREMENTS:
-1. Start your analysis by explicitly mentioning the Asset and the timeframe. 
-2. Answer the question directly and concisely, reference the explicitly requested indicators.
-2. Always include:
-   - Entry levels (with specific price targets)
-   - Stop loss levels
-   - Take profit targets
-   - Key support/resistance levels if relevant
-3. Explain which indicators support your analysis in natural language. Be opinionated and concise.
+The analysis should naturally flow from your expertise, but keep these key points in mind:
+- Always discuss BOTH immediate price levels and significant far-out levels that could be important
+- When suggesting targets, include a range from conservative near-term to aggressive longer-term targets
+- Support your analysis with the relevant indicators, explaining which signals you find most compelling
+- If you see significant levels far from the current price, don't hesitate to mention them - traders need to know both immediate opportunities and bigger picture targets
+- Consider high-volume price zones as potential targets, especially where they align with other technical levels
 
-Here are the technical indicators for {symbol} on the {timeframe} timeframe:
+Here are the technical indicators I've calculated for your analysis:
 
 {formatted_indicators}
 
-Please analyze these indicators in the context of the original question, ensuring to include all required elements."""
+Please provide your comprehensive analysis, keeping in mind the original question while ensuring you cover both near-term opportunities and longer-term potential."""
             
             messages = [
                 {"role": "system", "content": system_prompt},
