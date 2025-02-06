@@ -7,6 +7,7 @@ authors = ["0xArdi <ardianabazi09@gmail.com>", "nic0xflamel <nicflamel0x@gmail.c
 [tool.poetry.dependencies]
 python = "^3.10"
 pandas = "2.1.4"
+pandas-ta = "0.3.14b"
 numpy = "1.26.2"
 ta = "0.10.2"
 requests = "2.31.0"
