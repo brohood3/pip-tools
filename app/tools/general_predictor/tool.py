@@ -80,7 +80,7 @@ class GeneralPredictor:
         """Make a research query using Perplexity."""
         try:
             response = self.perplexity_client.chat.completions.create(
-                model="llama-3.1-sonar-large-128k-online",
+                model="sonar-reasoning",
                 messages=[
                     {
                         "role": "system",

@@ -218,7 +218,7 @@ Please provide an institutional-grade analysis covering:
             )
 
             response = self.perplexity_client.chat.completions.create(
-                model="llama-3.1-sonar-large-128k-online",
+                model="sonar-reasoning",
                 messages=[
                     {
                         "role": "system",
@@ -282,7 +282,7 @@ Please provide your strategic market assessment covering:
             )
 
             response = self.perplexity_client.chat.completions.create(
-                model="llama-3.1-sonar-large-128k-online",
+                model="sonar-reasoning",
                 messages=[
                     {
                         "role": "system",
@@ -401,7 +401,7 @@ CoinGecko ID: bitcoin
 Only provide these two lines, nothing else."""
 
             response = self.perplexity_client.chat.completions.create(
-                model="llama-3.1-sonar-large-128k-online",
+                model="sonar-reasoning",
                 messages=[
                     {
                         "role": "system",

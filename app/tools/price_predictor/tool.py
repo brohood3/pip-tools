@@ -90,7 +90,7 @@ Please ensure all analysis and predictions are made with this current time conte
         try:
             time_context = self._get_time_context()
             response = self.perplexity_client.chat.completions.create(
-                model="llama-3.1-sonar-large-128k-online",
+                model="sonar-reasoning",
                 messages=[
                     {
                         "role": "system",
