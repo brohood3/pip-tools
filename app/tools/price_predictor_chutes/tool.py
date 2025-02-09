@@ -1,5 +1,5 @@
 """
-Price Predictor Tool
+Price Predictor Tool (Chutes version)
 
 AI-powered price prediction tool that combines research from multiple sources
 to generate detailed price predictions for cryptocurrency and market-related questions.
@@ -45,7 +45,7 @@ class PricePredictor:
         )
         self.chutes_client = OpenAI(
             api_key=self.chutes_api_key,
-            base_url="https://chutes-unsloth-llama-3-3-70b-instruct.chutes.ai/v1"
+            base_url="https://chutes-qwen-qwen2-5-72b-instruct.chutes.ai/v1"
         )
 
     def _get_time_context(self) -> str:
@@ -54,8 +54,7 @@ class PricePredictor:
         return f"""Current time context:
 - Current date: {now.strftime('%Y-%m-%d')}
 - Current year: {now.year}
-- Current month: {now.strftime('%B')}
-Please ensure all analysis and predictions are made with this current time context in mind."""
+- Current month: {now.strftime('%B')}"""
 
     def run(self, prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
         """Main entry point for the price predictor tool.
@@ -68,236 +67,105 @@ Please ensure all analysis and predictions are made with this current time conte
             Dict containing prediction results and metadata
         """
         try:
-            # Gather research
-            research_results = self._gather_research(prompt)
-            if not research_results:
+            # Get research from Perplexity
+            research = self._get_research(prompt)
+            if not research:
                 return {"error": "Failed to gather research data"}
 
-            # Generate prediction
-            prediction = self._generate_prediction(prompt, research_results, system_prompt)
+            # Generate prediction with Chutes
+            prediction = self._generate_prediction(prompt, research, system_prompt)
             if not prediction:
                 return {"error": "Failed to generate prediction"}
 
-            # Store all context in metadata
+            # Store context in metadata
             metadata = {
                 "prompt": prompt,
                 "timestamp": datetime.now().isoformat(),
-                "research_results": research_results,
+                "research": research
             }
 
             return {"response": prediction, "metadata": metadata}
 
         except Exception as e:
+            print(f"Error in run method: {str(e)}")
             return {"error": str(e)}
 
-    def _get_research(self, prompt: str) -> str:
-        """Make a research query using Perplexity."""
+    def _get_research(self, prompt: str) -> Optional[str]:
+        """Get comprehensive research from Perplexity."""
         try:
+            print("Making Perplexity API call for research...")
             time_context = self._get_time_context()
+            research_prompt = f"""Analyze the price prediction request for: {prompt}
+
+Provide a comprehensive but concise analysis covering:
+1. Current price, market cap, and recent performance
+2. Key factors influencing the price (technical, fundamental, sentiment)
+3. Important dates and events that could impact price
+4. Different price scenarios (bull, base, bear cases)
+5. Expert predictions and technical levels
+
+{time_context}
+
+Format the response in clear sections with bullet points. Focus on specific numbers and data. Be concise."""
+
             response = self.perplexity_client.chat.completions.create(
                 model="sonar-reasoning",
                 messages=[
                     {
                         "role": "system",
-                        "content": f"""You are a research assistant focused on providing accurate, well-sourced information. For token price questions, always include current price, recent price action, and market sentiment. Be direct and concise.
-
-{time_context}
-
-Always ensure your research and analysis is current and relevant to the present date.""",
+                        "content": "You are a cryptocurrency research analyst. Provide accurate, data-driven analysis with specific numbers and clear insights."
                     },
-                    {"role": "user", "content": f"{prompt}\n\nNote: Please consider the current date and time context in your analysis."},
+                    {"role": "user", "content": research_prompt}
                 ],
+                max_tokens=1000,  # Limit research output
+                temperature=0.7
             )
-            return response.choices[0].message.content
+            print(f"Perplexity response tokens: {response.usage.completion_tokens}")
+            print("Perplexity API call successful")
+            research_content = response.choices[0].message.content
+            print(f"Research length: {len(research_content)} characters")
+            return research_content
         except Exception as e:
-            print(f"Error in research query: {e}")
-            return f"Research failed: {str(e)}"
-
-    def _gather_research(self, question: str) -> Optional[ResearchResults]:
-        """Gather all research components."""
-        try:
-            return {
-                "context": self._research_context(question),
-                "factors": self._research_factors(question),
-                "dates": self._research_dates(question),
-                "alternatives": self._research_alternatives(question),
-                "existing_predictions": self._research_existing_predictions(question),
-            }
-        except Exception as e:
-            print(f"Error gathering research: {e}")
+            print(f"Error in research: {str(e)}")
             return None
 
-    def _research_context(self, question: str) -> str:
-        """Research the general context and background."""
-        prompt = f"""Analyze the current price context for: {question}
-
-Focus on:
-- Current price and market cap
-- Recent price movements (7d, 30d, YTD)
-- Trading volume trends and patterns
-- Market sentiment indicators
-- Price correlation with major assets
-- Technical analysis indicators
-- Market structure and liquidity"""
-        return self._get_research(prompt)
-
-    def _research_factors(self, question: str) -> str:
-        """Research key influencing factors."""
-        prompt = f"""What are the main factors that will influence the price of: {question}
-
-Analyze:
-- Token utility and adoption metrics
-- Project development activity
-- Competition and market positioning
-- Upcoming token events (unlocks, burns, etc.)
-- Market correlation factors (BTC, ETH)
-- Trading volume and liquidity metrics
-- Institutional interest
-- Market sentiment indicators
-- Technical analysis patterns"""
-        return self._get_research(prompt)
-
-    def _research_dates(self, question: str) -> str:
-        """Research relevant dates and timelines."""
-        prompt = f"""What are the critical dates that could impact the price of: {question}
-
-Focus on:
-- Upcoming protocol updates
-- Token unlock schedules
-- Partnership announcements
-- Market events that could impact price
-- Historical price action dates
-- Technical analysis timeframes
-- Network upgrade schedules
-- Major ecosystem events"""
-        return self._get_research(prompt)
-
-    def _research_alternatives(self, question: str) -> str:
-        """Research alternative price scenarios."""
-        prompt = f"""What are the most likely price scenarios for: {question}
-
-Analyze:
-- Bull case: What could drive significant price upside?
-  * Target price levels
-  * Required conditions
-  * Probability assessment
-  * Timeline expectations
-
-- Base case: Most likely price trajectory
-  * Expected trading range
-  * Key support/resistance levels
-  * Volume expectations
-  * Market conditions
-
-- Bear case: Major risks and potential downsides
-  * Price floor estimates
-  * Risk factors
-  * Warning signals
-  * Market conditions"""
-        return self._get_research(prompt)
-
-    def _research_existing_predictions(self, question: str) -> str:
-        """Research existing price predictions and expert opinions."""
-        prompt = f"""What specific price predictions exist for: {question}
-
-Gather:
-- Analyst price targets
-- Technical analysis forecasts
-- On-chain metric projections
-- Market maker positioning
-- Options market implications
-- Community sentiment levels
-- Institutional forecasts
-- Historical price patterns"""
-        return self._get_research(prompt)
-
-    def _create_prediction_prompt(
-        self, question: str, research: ResearchResults
-    ) -> str:
-        """Create the final prediction prompt."""
-        return f"""Based on the following research, provide a detailed price prediction. You MUST provide specific price ranges with probabilities, even if confidence is low.
-
-QUESTION: {question}
-
-RESEARCH FINDINGS:
-
-1. Price Context and Background:
-{research['context']}
-
-2. Key Price Influencing Factors:
-{research['factors']}
-
-3. Relevant Dates and Timelines:
-{research['dates']}
-
-4. Alternative Price Scenarios:
-{research['alternatives']}
-
-5. Expert Price Predictions:
-{research['existing_predictions']}
-
-Provide your analysis in this format:
-
-MAIN PRICE PREDICTION:
-[Specific price range with timeframe, e.g., "$X to $Y by [date]"]
-
-KEY FACTORS DRIVING THIS PREDICTION:
-- [Most important factor]
-- [Second most important factor]
-- [Third most important factor]
-
-PRICE SCENARIOS:
-1. Bull Case: $[price]
-   - Key drivers
-   - Required conditions
-   - Technical levels
-   - Timeline
-
-2. Base Case: $[price]
-   - Key drivers
-   - Required conditions
-   - Technical levels
-   - Timeline
-
-3. Bear Case: $[price]
-   - Key drivers
-   - Required conditions
-   - Technical levels
-   - Timeline
-
-CONFIDENCE LEVEL: [1-10]
-[If confidence is low (1-4), explain why but still provide specific price targets]
-
-TIME HORIZON: [Specific timeframe for the prediction]
-
-CRITICAL PRICE RISKS:
-- [Key risk factor 1]
-- [Key risk factor 2]
-- [Key risk factor 3]
-
-KEY PRICE LEVELS TO WATCH:
-- Resistance: $[level 1], $[level 2]
-- Support: $[level 1], $[level 2]
-- Volume zones: $[level 1], $[level 2]"""
-
     def _generate_prediction(
-        self, question: str, research: ResearchResults, system_prompt: Optional[str] = None
+        self, question: str, research: str, system_prompt: Optional[str] = None
     ) -> Optional[str]:
         """Generate the final prediction using Chutes."""
         try:
-            prompt = self._create_prediction_prompt(question, research)
+            print("Making Chutes API call for prediction...")
             time_context = self._get_time_context()
+            prompt = f"""Based on this research, provide a detailed price prediction for: {question}
 
-            default_system_prompt = f"""You are a precise analytical engine specializing in price predictions. Your goal is to make decisive predictions with clear price targets and differentiated probabilities.
+RESEARCH:
+{research}
 
 {time_context}
 
-Always provide specific price targets with clear ranges. If uncertain, explain the uncertainties but still provide your best price targets based on the available data and research. Ensure all predictions and analysis are made within the current time context.
+Provide your analysis in this format:
 
-If your confidence level is 4 or lower, start your response with a note suggesting the user to provide more context about the token/project (e.g., full project name, website, or other identifying information) to get a more accurate prediction."""
+MAIN PREDICTION:
+- Price range with timeframe
+- Confidence level (1-10)
+- Key drivers
 
+SCENARIOS:
+1. Bull Case
+2. Base Case
+3. Base Case
+
+KEY LEVELS:
+- Support
+- Resistance"""
+
+            default_system_prompt = """You are a precise analytical engine specializing in price predictions. 
+Your goal is to make decisive predictions with clear price targets and probabilities. 
+Always provide specific numbers and ranges."""
+
+            print(f"Prompt length: {len(prompt)} characters")
             completion = self.chutes_client.chat.completions.create(
-                model="unsloth/Llama-3.3-70B-Instruct",
+                model="Qwen/Qwen2.5-72B-Instruct",
                 messages=[
                     {
                         "role": "system",
@@ -306,13 +174,17 @@ If your confidence level is 4 or lower, start your response with a note suggesti
                     {"role": "user", "content": prompt},
                 ],
                 temperature=0.7,
-                stream=False
+                stream=False,
+                max_tokens=1000  # Limit prediction output
             )
-
-            return completion.choices[0].message.content
+            print(f"Chutes response tokens: {completion.usage.completion_tokens}")
+            print("Chutes API call successful")
+            prediction_content = completion.choices[0].message.content
+            print(f"Prediction length: {len(prediction_content)} characters")
+            return prediction_content
 
         except Exception as e:
-            print(f"Error generating prediction: {e}")
+            print(f"Error generating prediction: {str(e)}")
             return None
 
 
