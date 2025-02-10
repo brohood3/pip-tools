@@ -38,9 +38,18 @@ class PricePredictor:
         if not all([self.openai_api_key, self.perplexity_api_key]):
             raise ValueError("Missing required API keys")
 
+        # Initialize OpenAI client with default timeout
         self.openai_client = OpenAI(api_key=self.openai_api_key)
+        
+        # Initialize Perplexity client with increased timeout and custom transport
+        timeout = httpx.Timeout(300.0, connect=60.0)  # 5 minutes total timeout, 60s connect timeout
+        transport = httpx.HTTPTransport(retries=1)  # Add retries for transient failures
+        
         self.perplexity_client = OpenAI(
-            api_key=self.perplexity_api_key, base_url="https://api.perplexity.ai"
+            api_key=self.perplexity_api_key,
+            base_url="https://api.perplexity.ai",
+            timeout=timeout,
+            http_client=httpx.Client(timeout=timeout, transport=transport)
         )
 
     def _get_time_context(self) -> str:
