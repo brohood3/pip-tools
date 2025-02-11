@@ -17,6 +17,18 @@ CREATOR_BID_ENDPOINT = ensure_var("CREATOR_BID_ENDPOINT", "https://creator.bid/a
 # from which tweet to start processing, useful in case of restarts, since we don't have a db.
 START_SINCE_TWEET_ID = ensure_var("START_SINCE_TWEET_ID", None, is_required=False)
 
+# Define which tools this bot has access to
+ALLOWED_TOOLS = [
+    "tool_selector",
+    "price_predictor",
+    "fundamental_analysis_venice",
+    "technical_analysis",
+    "ten_word_ta",
+    "general_predictor",
+    "lunar_crush_screener",
+    "query_extract"
+]
+
 openai_client = OpenAI()
 
 
@@ -107,13 +119,12 @@ def process_tweet(tweet: Dict[str, Any]) -> None:
     returns:
         None
     """
-    res = tool_selector(tweet['text'])
+    res = tool_selector(tweet['text'], allowed_tools=ALLOWED_TOOLS)
     tool_to_use = res.get("response", {}).get("tool", "none")
-    if  tool_to_use == "none":
+    if tool_to_use == "none":
         # ignore the tweet
         logger.info(f"Ignoring tweet {tweet['id']}: {tweet['text']} as it didnt match any tool")
         return
-
 
     if tool_to_use not in TOOL_TO_MODULE:
         logger.error(f"Tool {tool_to_use} not found")
