@@ -1,5 +1,5 @@
 name: technical_analysis
-description: Technical Analysis Tool providing comprehensive market analysis using key technical indicators. Focuses on high-probability trade setups with clear entry/exit points and risk management rules.
+description: Technical Analysis Tool providing comprehensive market analysis using key technical indicators. Focuses on high-probability trade setups with clear entry/exit points and risk management rules. Generates charts and provides technical analysis for different trading strategies.
 version: "1.0"
 use_cases:
   - Performing detailed technical analysis using multiple indicator categories
@@ -11,6 +11,10 @@ example_prompts:
   - "Find momentum setups for BTC/USDT using RSI and MACD"
   - "Look for breakout opportunities in SOL/USDT with Bollinger Bands"
   - "Give me scalping setups for BNB/USDT on 5min chart"
+  - "Provide a volatility analysis for DOGE/USDT using ATR and Bollinger Bands"
+  - "Generate a swing trading strategy for ADA/USDT on the daily chart"
+  - "Identify key support and resistance levels for XRP/USDT on the weekly timeframe"
+  - "Perform a comprehensive market analysis for LTC/USDT using Ichimoku Cloud and Fibonacci Retracements"
 required_params:
   prompt: string
 api_keys:
