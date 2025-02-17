@@ -1,0 +1,45 @@
+name: limit_order_generator
+description: Generates structured limit orders with precise entry points, stop losses, and take profit levels. Designed to work with screener outputs to create actionable trading orders with risk management rules.
+version: "1.0"
+use_cases:
+  - Converting trading opportunities into executable orders
+  - Setting up risk-managed trading positions
+  - Defining multi-level take profit targets
+  - Generating stop loss levels
+example_prompts:
+  - "Generate orders for screener opportunities"
+  - "Create limit orders with stop losses"
+  - "Set up multi-level take profit orders"
+  - "Generate risk-managed trading positions"
+required_params:
+  opportunities:
+    type: array
+    items:
+      symbol: string
+      entry:
+        price: number
+        timestamp: number
+output_format:
+  orders:
+    type: array
+    items:
+      symbol: string
+      entry:
+        price: number
+        timestamp: number
+      position_type: string  # "long" or "short"
+      risk_reward_ratio: number
+      orders:
+        stop_loss:
+          price: number
+          percentage: number
+        take_profit:
+          type: array
+          items:
+            price: number
+            percentage: number
+            size: number  # Portion of position to close at this level
+      metrics: object  # Original metrics from the opportunity
+  metadata:
+    total_opportunities: number
+    orders_generated: number 

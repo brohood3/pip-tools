@@ -1,0 +1,62 @@
+name: alt_rank_screener
+description: Specialized cryptocurrency screener that identifies high-potential trading opportunities using LunarCrush's Alt Rank metric. Combines multiple filters including alt rank improvements, price action, market cap, volume, and moving averages to find quality setups.
+version: "1.0"
+use_cases:
+  - Finding coins with significant alt rank improvements (100+ positions)
+  - Identifying coins with healthy price action (5-15% gains)
+  - Filtering for adequate liquidity and market cap
+  - Validating opportunities against moving averages
+  - Ranking opportunities by Galaxy Score
+example_prompts:
+  - "Screen for alt rank improvements in the last 24 hours"
+  - "Find coins with improving alt ranks and good volume"
+  - "Look for alt rank gainers with price momentum"
+  - "Screen for high Galaxy Score coins with alt rank gains"
+required_params:
+  use_historical: boolean
+  historical_date: string  # Optional, required if use_historical is true
+  db_path: string  # Optional, defaults to historical_data.db
+api_keys:
+  lunarcrush: string  # Required for live data, not needed for historical
+output_format:
+  opportunities:
+    type: array
+    items:
+      symbol: string
+      entry:
+        price: number
+        timestamp: number
+      metrics:
+        galaxy_score: number
+        alt_rank:
+          current: number
+          previous: number
+          improvement: number
+        market_cap: number
+        volume_24h: number
+        volatility: number
+        price_changes:
+          24h: number
+          7d: number
+      technical:
+        high_24h: number
+        low_24h: number
+        open: number
+        close: number
+      social:
+        sentiment: number
+        social_dominance: number
+        social_contributors:
+          active: number
+          new: number
+        social_posts:
+          active: number
+          new: number
+        interactions: number
+  metadata:
+    coins_analyzed: number
+    passed_initial_filter: number
+    final_opportunities: number
+    timestamp: string
+    source: string  # "historical" or "live"
+    date: string 
