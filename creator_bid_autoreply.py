@@ -26,7 +26,8 @@ ALLOWED_TOOLS = [
     "ten_word_ta",
     "general_predictor",
     "lunar_crush_screener",
-    "query_extract"
+    "query_extract",
+    "macro_outlook_analyzer"
 ]
 
 openai_client = OpenAI()
