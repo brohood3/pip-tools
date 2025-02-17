@@ -1,0 +1,14 @@
+name: macro_outlook_analyzer
+description: Generates comprehensive macro outlook reports for Bitcoin using Synth subnet predictions and AI analysis. Combines price direction and volatility predictions with current market conditions.
+example_prompts:
+  - "Generate a macro outlook report for Bitcoin"
+  - "What's the current market sentiment and outlook for BTC?"
+  - "Analyze Bitcoin's price trend and volatility"
+required_params:
+  prompt:
+    description: The user's request (not used in analysis but required for API compatibility)
+    type: string
+  system_prompt:
+    description: Optional custom system prompt for analysis
+    type: string
+    required: false 
