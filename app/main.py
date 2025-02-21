@@ -11,6 +11,9 @@ from app.utils.logging import logger
 
 app = FastAPI(title="Trading Tools API", docs_url="/docs", redoc_url="/redoc")
 
+# Track which tool last generated a chart
+last_chart_generator = None
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -62,6 +65,7 @@ async def run_tool_selector(request: ToolSelectorRequest):
 @app.post("/{tool_name}")
 async def run_tool(tool_name: str, prompt_request: PromptRequest, request: Request):
     """Generic endpoint for all other tools"""
+    global last_chart_generator
     # Case-insensitive lookup
     tool_name_lower = tool_name.lower()
     available_tools = {k.lower(): v for k, v in TOOL_TO_MODULE.items()}
@@ -81,39 +85,21 @@ async def run_tool(tool_name: str, prompt_request: PromptRequest, request: Reque
     if tool_name_lower in ["technical_analysis", "synth_chart_generator"] and "chart" in result:
         chart_data = result.pop("chart")  # Remove chart from main response
         if chart_data:  # Only add chart_url if we actually have a chart
+            last_chart_generator = tool_name_lower  # Track which tool generated the last chart
             result["chart_url"] = f"{base_url}/chart/latest"  # Full URL
     
-    return result  # Return the raw result
+    return result
 
 @app.get("/chart/latest")
 async def get_latest_chart():
     """Serve the latest generated chart image."""
+    global last_chart_generator
     try:
-        # Try to get chart from technical analysis tool first
-        tool = TOOL_TO_MODULE.get("technical_analysis")
-        if tool:
-            chart_data = tool.get_latest_chart()
-            if chart_data:
-                # Process and return the chart
-                if "base64," in chart_data:
-                    chart_data = chart_data.split("base64,")[1]
-                
-                try:
-                    image_bytes = base64.b64decode(chart_data)
-                    headers = {
-                        "Cache-Control": "public, max-age=300",  # Cache for 5 minutes
-                        "ETag": str(hash(chart_data))  # Add ETag for caching
-                    }
-                    return StreamingResponse(
-                        BytesIO(image_bytes), 
-                        media_type="image/png",
-                        headers=headers
-                    )
-                except Exception as e:
-                    raise HTTPException(status_code=500, detail="Invalid chart data")
-        
-        # If no technical analysis chart, try synth chart generator
-        tool = TOOL_TO_MODULE.get("synth_chart_generator")
+        if not last_chart_generator:
+            raise HTTPException(status_code=404, detail="No chart available")
+
+        # Get the tool that last generated a chart
+        tool = TOOL_TO_MODULE.get(last_chart_generator)
         if tool:
             chart_data = tool.get_latest_chart()
             if chart_data:
