@@ -72,8 +72,8 @@ async def run_tool(tool_name: str, prompt_request: PromptRequest, request: Reque
     tool = available_tools[tool_name_lower]
     result = tool.run(prompt_request.prompt, prompt_request.system_prompt)
     
-    # Handle chart data for technical analysis tool
-    if tool_name_lower == "technical_analysis" and "chart" in result:
+    # Handle chart data for tools that generate charts
+    if tool_name_lower in ["technical_analysis", "synth_chart_generator"] and "chart" in result:
         chart_data = result.pop("chart")  # Remove chart from main response
         if chart_data:  # Only add chart_url if we actually have a chart
             base_url = str(request.base_url).rstrip('/')
@@ -85,38 +85,54 @@ async def run_tool(tool_name: str, prompt_request: PromptRequest, request: Reque
 async def get_latest_chart():
     """Serve the latest generated chart image."""
     try:
-        # Get the technical analysis tool
+        # Try to get chart from technical analysis tool first
         tool = TOOL_TO_MODULE.get("technical_analysis")
-        if not tool:
-            raise HTTPException(status_code=500, detail="Technical analysis tool not available")
-            
-        # Get the latest chart
-        chart_data = tool.get_latest_chart()
-        if not chart_data:
-            raise HTTPException(status_code=404, detail="No chart available")
-            
-        # Remove the data URI prefix if present
-        if "base64," in chart_data:
-            chart_data = chart_data.split("base64,")[1]
-            
-        # Convert base64 to bytes
-        try:
-            image_bytes = base64.b64decode(chart_data)
-        except Exception as e:
-            raise HTTPException(status_code=500, detail="Invalid chart data")
+        if tool:
+            chart_data = tool.get_latest_chart()
+            if chart_data:
+                # Process and return the chart
+                if "base64," in chart_data:
+                    chart_data = chart_data.split("base64,")[1]
+                
+                try:
+                    image_bytes = base64.b64decode(chart_data)
+                    headers = {
+                        "Cache-Control": "public, max-age=300",  # Cache for 5 minutes
+                        "ETag": str(hash(chart_data))  # Add ETag for caching
+                    }
+                    return StreamingResponse(
+                        BytesIO(image_bytes), 
+                        media_type="image/png",
+                        headers=headers
+                    )
+                except Exception as e:
+                    raise HTTPException(status_code=500, detail="Invalid chart data")
         
-        # Return the image with caching headers
-        headers = {
-            "Cache-Control": "public, max-age=300",  # Cache for 5 minutes
-            "ETag": str(hash(chart_data))  # Add ETag for caching
-        }
+        # If no technical analysis chart, try synth chart generator
+        tool = TOOL_TO_MODULE.get("synth_chart_generator")
+        if tool:
+            chart_data = tool.get_latest_chart()
+            if chart_data:
+                # Process and return the chart
+                if "base64," in chart_data:
+                    chart_data = chart_data.split("base64,")[1]
+                
+                try:
+                    image_bytes = base64.b64decode(chart_data)
+                    headers = {
+                        "Cache-Control": "public, max-age=300",  # Cache for 5 minutes
+                        "ETag": str(hash(chart_data))  # Add ETag for caching
+                    }
+                    return StreamingResponse(
+                        BytesIO(image_bytes), 
+                        media_type="image/png",
+                        headers=headers
+                    )
+                except Exception as e:
+                    raise HTTPException(status_code=500, detail="Invalid chart data")
         
-        return StreamingResponse(
-            BytesIO(image_bytes), 
-            media_type="image/png",
-            headers=headers
-        )
-        
+        raise HTTPException(status_code=404, detail="No chart available")
+            
     except Exception as e:
         logger.exception("Error serving chart")
         raise HTTPException(status_code=500, detail=str(e))

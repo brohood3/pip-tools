@@ -1,0 +1,40 @@
+name: synth_chart_generator
+description: "Generates Bitcoin (BTC) price prediction charts using the Synth API. Creates visualizations showing median predictions alongside individual simulation paths. Note: This tool only works with BTC and cannot analyze other assets."
+version: "1.0"
+use_cases:
+  - "Visualizing Synth's BTC price predictions and simulations"
+  - "Analyzing potential Bitcoin price trajectories from Synth"
+  - "Generating Synth prediction charts for BTC"
+  - "Comparing different Synth BTC price scenarios"
+example_prompts:
+  - "Generate Synth chart for BTC"
+  - "Show me Synth's Bitcoin price simulations"
+  - "Create a Synth prediction chart for Bitcoin"
+  - "Visualize Synth's BTC price forecast"
+  - "Get Synth's Bitcoin chart"
+required_params:
+  prompt:
+    type: string
+    description: "The request for BTC chart generation (note: asset is always BTC regardless of prompt)"
+api_keys:
+  synth: string  # Synth API key for predictions
+output_format:
+  response: string  # Final predicted price with $ and commas
+  metadata:
+    asset: string  # Always "BTC"
+    timestamp: string  # ISO format timestamp
+    prediction_timeframe: string  # "24h"
+    predictions:
+      type: array
+      items:
+        time: string  # ISO format timestamp
+        price: number  # Predicted price
+  chart_url: string  # URL to access the generated chart
+error_messages:
+  - "Missing SYNTH_API_KEY environment variable"
+  - "Failed to get price predictions from Synth subnet"
+limitations:
+  - "Only works with Bitcoin (BTC)"
+  - "Cannot analyze other cryptocurrencies"
+  - "Always generates 24-hour predictions"
+  - "Requires Synth API access" 
