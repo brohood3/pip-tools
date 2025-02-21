@@ -70,13 +70,17 @@ async def run_tool(tool_name: str, prompt_request: PromptRequest, request: Reque
         raise ToolNotFoundError(tool_name)
 
     tool = available_tools[tool_name_lower]
+    
+    # Get the base URL from the request
+    base_url = str(request.base_url).rstrip('/')
+    
+    # Run the tool (no base_url parameter needed)
     result = tool.run(prompt_request.prompt, prompt_request.system_prompt)
     
     # Handle chart data for tools that generate charts
     if tool_name_lower in ["technical_analysis", "synth_chart_generator"] and "chart" in result:
         chart_data = result.pop("chart")  # Remove chart from main response
         if chart_data:  # Only add chart_url if we actually have a chart
-            base_url = str(request.base_url).rstrip('/')
             result["chart_url"] = f"{base_url}/chart/latest"  # Full URL
     
     return result  # Return the raw result

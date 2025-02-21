@@ -253,7 +253,7 @@ def _run_internal(asset: str) -> Dict[str, Any]:
         Dictionary containing:
         - response: Most likely prediction price
         - metadata: Information about the prediction including all price points
-        - chart_url: URL to access the generated chart
+        - chart: Base64 encoded chart data
     """
     try:
         # Load environment variables
@@ -294,7 +294,7 @@ def _run_internal(asset: str) -> Dict[str, Any]:
                 "prediction_timeframe": "24h",
                 "predictions": most_likely_prediction
             },
-            "chart_url": "http://localhost:8000/chart/latest"
+            "chart": chart  # Return chart data directly
         }
 
     except Exception as e:
@@ -323,9 +323,9 @@ class SynthChartGenerator:
             
         Returns:
             Dictionary containing:
-            - chart: Base64 encoded PNG chart image with data URI prefix
-            - predictions: List of prediction data points
-            - metadata: Additional information about the prediction
+            - response: Final predicted price with formatting
+            - metadata: Information about the prediction including all price points
+            - chart: Base64 encoded chart data
         """
         return _run_internal("BTC")
 
