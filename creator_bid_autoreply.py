@@ -1,5 +1,6 @@
 import logging
 import time
+from datetime import datetime
 from typing import Dict, Any
 
 import requests
@@ -29,6 +30,7 @@ ALLOWED_TOOLS = [
     "query_extract",
     "macro_outlook_analyzer"
 ]
+day_to_author_count = {}
 
 openai_client = OpenAI()
 
@@ -120,6 +122,17 @@ def process_tweet(tweet: Dict[str, Any]) -> None:
     returns:
         None
     """
+    day = datetime.now().strftime("%Y-%m-%d")
+    author = tweet.get("author_id")
+
+    if day not in day_to_author_count:
+        day_to_author_count[day] = {}
+
+    author_count = day_to_author_count.get(day, {}).get(author, 0)
+    if author_count >= 5:
+        logger.info(f"Reached the limit of 5 tweets per author {author} for today. Ignoring tweet {tweet['id']}")
+        return
+
     res = tool_selector(tweet['text'], allowed_tools=ALLOWED_TOOLS)
     tool_to_use = res.get("response", {}).get("tool", "none")
     if tool_to_use == "none":
@@ -137,6 +150,7 @@ def process_tweet(tweet: Dict[str, Any]) -> None:
 
     logger.info(f"Replying to tweet {tweet['id']} with: {reply_text}")
     reply_to_tweet(tweet['id'], reply_text)
+    day_to_author_count[day][author] = author_count + 1
 
 
 def main():
