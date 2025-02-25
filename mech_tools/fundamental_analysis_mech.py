@@ -192,7 +192,7 @@ Please provide an institutional-grade analysis covering:
 """
 
         response = clients.perplexity_client.chat.completions.create(
-            model="llama-3.1-sonar-large-128k-online",
+            model="sonar",
             messages=[{
                 "role": "system",
                 "content": "You are a senior blockchain researcher at a $500M crypto fund. Your research directly influences investment allocation decisions. Maintain professional skepticism and support claims with evidence."
@@ -249,7 +249,7 @@ Please provide your strategic market assessment covering:
 Please use real-time market data and recent developments in your analysis."""
 
         response = clients.perplexity_client.chat.completions.create(
-            model="llama-3.1-sonar-large-128k-online",
+            model="sonar",
             messages=[{
                 "role": "system",
                 "content": "You are the Chief Market Strategist at a prestigious digital asset investment firm. Your insights guide institutional investment strategies. Focus on macro trends, market dynamics, and strategic positioning."
@@ -349,7 +349,7 @@ CoinGecko ID: bitcoin
 Only provide these two lines, nothing else. Do not add any citations, references, or extra characters."""
 
         response = clients.perplexity_client.chat.completions.create(
-            model="llama-3.1-sonar-large-128k-online",
+            model="sonar",
             messages=[{
                 "role": "system",
                 "content": "You are a cryptocurrency expert. Your task is to identify the specific cryptocurrency being discussed and provide its exact CoinGecko ID. Be precise and only return the requested format. Never add citations or references."
@@ -422,7 +422,7 @@ Please provide a thorough market analysis covering:
 Focus on providing actionable insights for sophisticated investors who understand the crypto market dynamics."""
 
         response = clients.perplexity_client.chat.completions.create(
-            model="llama-3.1-sonar-large-128k-online",
+            model="sonar",
             messages=[{
                 "role": "system",
                 "content": "You are the Chief Market Strategist at a prestigious digital asset investment firm. Your analysis guides institutional investment strategies across the cryptocurrency market. Be thorough, data-driven, and focus on actionable insights."

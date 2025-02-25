@@ -154,7 +154,7 @@ Please create a detailed macro outlook report that includes:
 Focus on integrating the scores with CURRENT macro conditions to provide actionable insights."""
 
         response = clients.perplexity_client.chat.completions.create(
-            model="llama-3.1-sonar-large-128k-online", 
+            model="sonar", 
             messages=[{"role": "user", "content": prompt}]
         )
         

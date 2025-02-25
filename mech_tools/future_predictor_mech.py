@@ -31,7 +31,7 @@ class ResearchComponent:
         """Make a research query using Perplexity."""
         try:
             response = self.clients.perplexity_client.chat.completions.create(
-                model="llama-3.1-sonar-large-128k-online",
+                model="sonar",
                 messages=[
                     {"role": "system", "content": "You are a research assistant focused on providing accurate, well-sourced information. For token price questions, always include current price, recent price action, and market sentiment. Be direct and concise."},
                     {"role": "user", "content": prompt}

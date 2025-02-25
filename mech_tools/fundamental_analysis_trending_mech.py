@@ -212,7 +212,7 @@ Please provide an institutional-grade analysis covering:
 """
 
         response = clients.perplexity_client.chat.completions.create(
-            model="llama-3.1-sonar-large-128k-online",
+            model="sonar",
             messages=[{
                 "role": "system",
                 "content": "You are a senior blockchain researcher at a $500M crypto fund. Your research directly influences investment allocation decisions. Maintain professional skepticism and support claims with evidence."
@@ -269,7 +269,7 @@ Please provide your strategic market assessment covering:
 Please use real-time market data and recent developments in your analysis."""
 
         response = clients.perplexity_client.chat.completions.create(
-            model="llama-3.1-sonar-large-128k-online",
+            model="sonar",
             messages=[{
                 "role": "system",
                 "content": "You are the Chief Market Strategist at a prestigious digital asset investment firm. Your insights guide institutional investment strategies. Focus on macro trends, market dynamics, and strategic positioning."
