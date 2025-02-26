@@ -112,7 +112,7 @@ def process_tweet(tweet: Dict[str, Any]) -> None:
     Steps:
         1. Extract the text from the tweet.
         2. Run the tool selector on the text.
-        3. If a tool is applicable, use it.
+        3. If a tool is applicable with high confidence, use it.
         4. Get the result using a tool.
         5. Reply to the tweet with the result.
 
@@ -129,15 +129,18 @@ def process_tweet(tweet: Dict[str, Any]) -> None:
         day_to_author_count[day] = {}
 
     author_count = day_to_author_count.get(day, {}).get(author, 0)
-    if author_count >= 5:
+    if author_count >= 3:
         logger.info(f"Reached the limit of 5 tweets per author {author} for today. Ignoring tweet {tweet['id']}")
         return
 
     res = tool_selector(tweet['text'], allowed_tools=ALLOWED_TOOLS)
-    tool_to_use = res.get("response", {}).get("tool", "none")
-    if tool_to_use == "none":
-        # ignore the tweet
-        logger.info(f"Ignoring tweet {tweet['id']}: {tweet['text']} as it didnt match any tool")
+    tool_response = res.get("response", {})
+    tool_to_use = tool_response.get("tool", "none")
+    confidence = tool_response.get("confidence", "low")
+
+    if tool_to_use == "none" or confidence != "high":
+        # ignore the tweet if no tool selected or confidence is not high
+        logger.info(f"Ignoring tweet {tweet['id']}: {tweet['text']} - Tool: {tool_to_use}, Confidence: {confidence}")
         return
 
     if tool_to_use not in TOOL_TO_MODULE:
