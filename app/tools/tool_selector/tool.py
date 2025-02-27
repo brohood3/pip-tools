@@ -98,6 +98,8 @@ Analyze the request and identify:
 1. What is the user trying to achieve? (Include type of analysis/data needed)
 2. What specific entities are mentioned (tokens, wallets, timeframes)?
 3. Is this about past, present, or future information?
+4. Is the user asking for information about how to use a tool (documentation/help) or are they trying to actually use a tool? Be explicit about this distinction.
+
 
 Provide your analysis."""
 
@@ -158,6 +160,7 @@ Consider the following when making your selection:
    - Multiple tokens need to be analyzed separately
    - Multiple tools could be applicable
    - The request is ambiguous between technical and fundamental analysis
+4. If the user is asking how to use a tool or requesting information about tool functionality, select "none".
 
 Select the most appropriate tool. Use the exact tool name from the list above.
 Pay special attention to the example prompts - if the user's request is similar to an example prompt for a tool, that tool is likely the best choice.
