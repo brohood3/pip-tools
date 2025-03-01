@@ -1,0 +1,26 @@
+name: research_assistant
+description: Simple research tool that provides up-to-date information on general knowledge queries using the Perplexity API with the sonar-reasoning model.
+version: "1.0"
+use_cases:
+  - Answering factual questions
+  - Providing current information on events, people, and topics
+  - Summarizing complex topics
+  - Gathering information for reports or analysis
+  - Fact-checking claims
+example_prompts:
+  - "What are the latest developments in quantum computing?"
+  - "Summarize the current economic situation in the EU"
+  - "What is the status of renewable energy adoption worldwide?"
+  - "Who are the leading candidates in the upcoming election?"
+  - "What are the latest breakthroughs in AI research?"
+required_params:
+  query: string
+api_keys:
+  perplexity: string
+output_format:
+  response: string  # The researched information
+  metadata:
+    timestamp: string
+    query: string
+    model: string
+    requested_model: string  # The model requested by the user (if any) 
