@@ -13,6 +13,8 @@ from openai import OpenAI
 import re
 from dotenv import load_dotenv
 from datetime import datetime
+from app.utils.config import DEFAULT_MODEL
+from app.utils.llm import generate_completion
 
 
 # --- Type Definitions ---
@@ -81,13 +83,14 @@ def load_tool_configs(allowed_tools: Optional[List[str]] = None) -> ToolsConfig:
 
 
 # --- Intent Analysis ---
-def analyze_intent(client: OpenAI, prompt: str) -> str:
+def analyze_intent(client: OpenAI, prompt: str, model: Optional[str] = None) -> str:
     """
     First stage: Analyze the user's intent using GPT-4.
 
     Args:
         client: OpenAI client instance
         prompt: User's original request
+        model: Optional model to use for analysis
 
     Returns:
         Detailed analysis of user's intent and requirements
@@ -103,21 +106,20 @@ Analyze the request and identify:
 
 Provide your analysis."""
 
-    response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {
-                "role": "system",
-                "content": "You are a helpful assistant analyzing user requests.",
-            },
-            {"role": "user", "content": analysis_prompt},
-        ],
+    # Use the provided model or fall back to the default model
+    model_to_use = model or DEFAULT_MODEL
+
+    system_prompt = "You are a helpful assistant analyzing user requests."
+    
+    return generate_completion(
+        prompt=analysis_prompt,
+        system_prompt=system_prompt,
+        model=model_to_use
     )
-    return response.choices[0].message.content
 
 
 # --- Tool Selection ---
-def select_tool(client: OpenAI, analysis: str, tools_config: ToolsConfig, system_prompt: Optional[str] = None) -> str:
+def select_tool(client: OpenAI, analysis: str, tools_config: ToolsConfig, system_prompt: Optional[str] = None, model: Optional[str] = None) -> str:
     """
     Second stage: Select the appropriate tool based on the analysis.
 
@@ -126,6 +128,7 @@ def select_tool(client: OpenAI, analysis: str, tools_config: ToolsConfig, system
         analysis: Intent analysis from first stage
         tools_config: Configuration of all available tools
         system_prompt: Optional custom system prompt for tool selection
+        model: Optional model to use for tool selection
 
     Returns:
         Structured response with tool selection and confidence
@@ -171,17 +174,16 @@ CONFIDENCE: [high/medium/low]
 REASONING: [brief explanation]
 ADDITIONAL_INFO: [any notes about multiple tokens or tools that might be needed]"""
 
-    response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {
-                "role": "system",
-                "content": system_prompt if system_prompt else "You are a helpful assistant selecting the appropriate tool. Always use the exact tool name provided. Be conservative with confidence levels when requests are ambiguous or require multiple tools/tokens.",
-            },
-            {"role": "user", "content": selection_prompt},
-        ],
+    # Use the provided model or fall back to the default model
+    model_to_use = model or DEFAULT_MODEL
+
+    default_system_prompt = "You are a helpful assistant selecting the appropriate tool. Always use the exact tool name provided. Be conservative with confidence levels when requests are ambiguous or require multiple tools/tokens."
+    
+    return generate_completion(
+        prompt=selection_prompt,
+        system_prompt=system_prompt if system_prompt else default_system_prompt,
+        model=model_to_use
     )
-    return response.choices[0].message.content
 
 
 def parse_tool_selection(
@@ -224,7 +226,8 @@ def get_tool_for_prompt(
     client: OpenAI, 
     prompt: str, 
     system_prompt: Optional[str] = None,
-    allowed_tools: Optional[List[str]] = None
+    allowed_tools: Optional[List[str]] = None,
+    model: Optional[str] = None
 ) -> Union[ToolResult, NoToolResult]:
     """
     Main function to determine which tool to use for a given prompt.
@@ -234,6 +237,7 @@ def get_tool_for_prompt(
         prompt: User's original request
         system_prompt: Optional custom system prompt for tool selection
         allowed_tools: Optional list of allowed tool names. If None, all tools are available.
+        model: Optional model to use for analysis and tool selection
 
     Returns:
         Dictionary containing either:
@@ -253,13 +257,13 @@ def get_tool_for_prompt(
         }
 
     # Stage 1: Analyze intent
-    intent_analysis = analyze_intent(client, prompt)
+    intent_analysis = analyze_intent(client, prompt, model)
     print("\nINTENT ANALYSIS:")
     print("-" * 50)
     print(intent_analysis)
 
     # Stage 2: Select tool
-    tool_selection = select_tool(client, intent_analysis, tools_config, system_prompt)
+    tool_selection = select_tool(client, intent_analysis, tools_config, system_prompt, model)
     print("\nTOOL SELECTION:")
     print("-" * 50)
     print(tool_selection)
@@ -348,7 +352,7 @@ openai_client = OpenAI()
 
 
 # Add the run function to match the API
-def run(prompt: str, system_prompt: Optional[str] = None, allowed_tools: Optional[List[str]] = None) -> Dict[str, Any]:
+def run(prompt: str, system_prompt: Optional[str] = None, allowed_tools: Optional[List[str]] = None, model: Optional[str] = None) -> Dict[str, Any]:
     """
     Main entry point for the tool selector.
     
@@ -356,8 +360,9 @@ def run(prompt: str, system_prompt: Optional[str] = None, allowed_tools: Optiona
         prompt: User's request
         system_prompt: Optional custom system prompt
         allowed_tools: Optional list of allowed tool names
+        model: Optional model name to use for OpenAI API calls
         
     Returns:
         Tool selection result
     """
-    return get_tool_for_prompt(openai_client, prompt, system_prompt, allowed_tools)
+    return get_tool_for_prompt(openai_client, prompt, system_prompt, allowed_tools, model)

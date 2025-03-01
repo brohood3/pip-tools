@@ -12,6 +12,8 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from fastapi import HTTPException
 import httpx
+from app.utils.config import DEFAULT_MODEL
+from app.utils.llm import generate_completion
 
 # Load environment variables
 load_dotenv()
@@ -259,20 +261,14 @@ MONITORING METRICS:
         """Generate the final prediction using OpenAI."""
         try:
             prompt = self._create_prediction_prompt(question, research)
-
-            completion = self.openai_client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": system_prompt if system_prompt else "You are a precise analytical engine specializing in future predictions. Your goal is to make decisive predictions with clear outcomes. If uncertain, explain the uncertainties but still provide your best assessment based on the available data and research.",
-                    },
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0.7,
+            
+            default_system_prompt = "You are a precise analytical engine specializing in future predictions. Your goal is to make decisive predictions with clear outcomes. If uncertain, explain the uncertainties but still provide your best assessment based on the available data and research."
+            
+            return generate_completion(
+                prompt=prompt,
+                system_prompt=system_prompt if system_prompt else default_system_prompt,
+                temperature=0.7
             )
-
-            return completion.choices[0].message.content
 
         except Exception as e:
             print(f"Error generating prediction: {e}")

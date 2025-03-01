@@ -13,6 +13,7 @@ import requests
 from openai import OpenAI
 from dotenv import load_dotenv
 from fastapi import HTTPException
+from app.utils.config import DEFAULT_MODEL
 
 
 # --- Type Definitions ---
@@ -88,64 +89,44 @@ class FundamentalAnalysis:
     def get_investment_analysis(
         self, token_details: Optional[TokenDetails], original_prompt: str
     ) -> Optional[str]:
-        """Get focused tokenomics and market sentiment analysis"""
+        """Generate tokenomics and investment analysis using OpenAI."""
+        if not token_details:
+            return None
+
         try:
-            # Base prompt with original user request
-            base_prompt = f"""Original Request: "{original_prompt}"
+            prompt = f"""Analyze the tokenomics and investment potential for {token_details['name']} ({token_details['symbol']}) based on the following data:
 
-"""
-            # Add market data if available
-            if token_details:
-                base_prompt += f"""Token: {token_details['name']} ({token_details['symbol']})
-Key Metrics:
-- Market Cap: ${token_details['market_cap']:,.2f}
-- Market Cap/FDV Ratio: {token_details['market_cap_fdv_ratio']:.2f}
-- 24h Price Change: {token_details['price_change_24h']:.2f}%
-- 14d Price Change: {token_details['price_change_14d']:.2f}%
-- Social Following: {token_details['twitter_followers']:,} Twitter followers
-"""
+Market Cap: ${token_details['market_cap']:,.2f}
+Market Cap / FDV Ratio: {token_details['market_cap_fdv_ratio']:.2f}
+24h Price Change: {token_details['price_change_24h']:.2f}%
+14d Price Change: {token_details['price_change_14d']:.2f}%
+Twitter Followers: {token_details['twitter_followers']:,}
 
-            prompt = (
-                base_prompt
-                + """As a seasoned tokenomics expert at a top crypto venture capital firm, analyze this investment opportunity for our institutional investors.
+Focus on:
+1. Tokenomics analysis (supply, distribution, inflation)
+2. Market positioning and competitive advantages
+3. Investment thesis (bull and bear cases)
+4. Key metrics to monitor
+5. Risk assessment
 
-Your analysis should be suitable for sophisticated investors who:
-- Understand DeFi fundamentals
-- Are looking for detailed technical analysis
-- Need clear risk/reward assessments
-- Require institutional-grade due diligence
+Original user query: "{original_prompt}"
 
-Please provide your VC firm's analysis covering:
+Provide a detailed, balanced analysis that considers both positive and negative factors."""
 
-1. Tokenomics Analysis:
-   - Token distribution and supply dynamics
-   - Market valuation assessment
-   - Supply/demand dynamics
-   - Potential dilution risks
-
-2. Market Momentum Analysis:
-   - Recent price action and trends
-   - Market sentiment indicators
-   - Social metrics and community engagement
-   - Relative valuation metrics"""
+            system_prompt = "You are a cryptocurrency investment analyst specializing in tokenomics and fundamental analysis. Provide balanced, data-driven insights that consider both bull and bear cases."
+            
+            # Use the LiteLLM utility instead of direct OpenAI call
+            from app.utils.llm import generate_completion
+            
+            return generate_completion(
+                prompt=prompt,
+                system_prompt=system_prompt,
+                model=DEFAULT_MODEL,
+                temperature=0.7
             )
-
-            completion = self.openai_client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are the head of tokenomics research at a prestigious crypto venture capital firm. Your analyses influence multi-million dollar investment decisions. Be thorough, technical, and unbiased in your assessment.",
-                    },
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0.7,
-            )
-
-            return completion.choices[0].message.content
 
         except Exception as e:
-            print(f"Error generating analysis: {e}")
+            print(f"Error generating investment analysis: {e}")
             return None
 
     def get_project_research(
@@ -307,77 +288,57 @@ Please provide your strategic market assessment covering:
         original_prompt: str,
         system_prompt: Optional[str] = None,
     ) -> str:
-        """Generate comprehensive investment report combining all analyses"""
-        try:
-            # Base prompt with original user request
-            base_prompt = f"""Original Request: "{original_prompt}"
+        """Generate a comprehensive investment report combining all analyses."""
+        if not token_details:
+            return "Could not generate report: Token details not available."
 
-"""
-            # Add market data if available
-            if token_details:
-                base_prompt += f"""Token: {token_details['name']} ({token_details['symbol']})
-Chain: {token_details['chain']}
-Key Metrics:
+        try:
+            prompt = f"""Create a comprehensive investment report for {token_details['name']} ({token_details['symbol']}) based on the following analyses:
+
+TOKEN DETAILS:
 - Market Cap: ${token_details['market_cap']:,.2f}
-- Market Cap/FDV Ratio: {token_details['market_cap_fdv_ratio']:.2f}
+- Market Cap / FDV Ratio: {token_details['market_cap_fdv_ratio']:.2f}
 - 24h Price Change: {token_details['price_change_24h']:.2f}%
 - 14d Price Change: {token_details['price_change_14d']:.2f}%
-- Social Following: {token_details['twitter_followers']:,} Twitter followers
-"""
+- Twitter Followers: {token_details['twitter_followers']:,}
 
-            prompt = (
-                base_prompt
-                + f"""As the Chief Investment Officer of a leading crypto investment firm, analyze our research findings and provide your investment thesis.
-
-RESEARCH FINDINGS:
-
-1. Tokenomics Analysis:
+TOKENOMICS ANALYSIS:
 {tokenomics_analysis}
 
-2. Project Research:
+PROJECT RESEARCH:
 {project_research}
 
-3. Market Context:
+MARKET CONTEXT:
 {market_context}
 
-Based on this research, provide your investment thesis with clear sections. Structure your response like this:
+Original user query: "{original_prompt}"
 
-# Investment Stance
+Format your response as a complete investment report with these sections:
+1. Executive Summary (with clear investment recommendation)
+2. Project Overview
+3. Tokenomics Assessment
+4. Market Position Analysis
+5. Risk Factors
+6. Investment Outlook (short, medium, and long term)
+7. Key Metrics to Monitor
 
-[Main investment thesis backed by specific data points from all three analyses]
+Be balanced, data-driven, and provide specific insights rather than generic statements."""
 
-# Opportunities and Risks
-
-[Key opportunities and risks analysis]
-
-# Entry/Exit Strategy
-
-[Strategic actionable recommendations]
-
-# Key Metrics
-
-[Important metrics to watch that could change your thesis]
-
-Use clear line breaks between sections and paragraphs. Keep each section focused and concise."""
+            default_system_prompt = "You are a cryptocurrency investment analyst creating comprehensive reports for investors. Your analysis is balanced, data-driven, and provides specific insights rather than generic statements. You always include both bull and bear perspectives. Output the investment report directly without repeating these instructions or explaining what you're going to do."
+            
+            # Use the LiteLLM utility instead of direct OpenAI call
+            from app.utils.llm import generate_completion
+            
+            return generate_completion(
+                prompt=prompt,
+                system_prompt=system_prompt if system_prompt else default_system_prompt,
+                model=DEFAULT_MODEL,
+                temperature=0.7
             )
-
-            completion = self.openai_client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": system_prompt if system_prompt else "You are the Chief Investment Officer at a prestigious crypto investment firm. Format your analysis with clear sections separated by line breaks. Make clear, opinionated investment recommendations backed by data. Be decisive but support all major claims with evidence.",
-                    },
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0.7,
-            )
-
-            return completion.choices[0].message.content
 
         except Exception as e:
             print(f"Error generating investment report: {e}")
-            return None
+            return f"Error generating investment report: {str(e)}"
 
     def get_coingecko_id_from_prompt(self, prompt: str) -> Optional[str]:
         """Extract CoinGecko ID from natural language prompt"""

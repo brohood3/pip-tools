@@ -12,6 +12,8 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from fastapi import HTTPException
 import httpx
+from app.utils.config import DEFAULT_MODEL
+from app.utils.llm import generate_completion
 
 # Load environment variables
 load_dotenv()
@@ -61,12 +63,13 @@ class PricePredictor:
 - Current month: {now.strftime('%B')}
 Please ensure all analysis and predictions are made with this current time context in mind."""
 
-    def run(self, prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
+    def run(self, prompt: str, system_prompt: Optional[str] = None, model: Optional[str] = None) -> Dict[str, Any]:
         """Main entry point for the price predictor tool.
 
         Args:
             prompt: User's prediction request
             system_prompt: Optional custom system prompt for the final prediction
+            model: Optional model to use for prediction (defaults to DEFAULT_MODEL)
 
         Returns:
             Dict containing prediction results and metadata
@@ -78,7 +81,7 @@ Please ensure all analysis and predictions are made with this current time conte
                 return {"error": "Failed to gather research data"}
 
             # Generate prediction
-            prediction = self._generate_prediction(prompt, research_results, system_prompt)
+            prediction = self._generate_prediction(prompt, research_results, system_prompt, model)
             if not prediction:
                 return {"error": "Failed to generate prediction"}
 
@@ -94,8 +97,54 @@ Please ensure all analysis and predictions are made with this current time conte
         except Exception as e:
             return {"error": str(e)}
 
+    def _gather_research(self, question: str) -> Optional[ResearchResults]:
+        """
+        Gather research from multiple angles using Perplexity.
+        
+        Args:
+            question: The question to research
+            
+        Returns:
+            Dictionary of research results
+        """
+        try:
+            print(f"Starting research on: {question}")
+            
+            # Execute all research methods
+            context = self._research_context(question)
+            factors = self._research_factors(question)
+            dates = self._research_dates(question)
+            alternatives = self._research_alternatives(question)
+            existing_predictions = self._research_existing_predictions(question)
+            
+            # Validate that all responses were received
+            if not all([context, factors, dates, alternatives, existing_predictions]):
+                print("One or more research components failed")
+                return None
+                
+            # Compile all research
+            return {
+                "context": context,
+                "factors": factors,
+                "dates": dates,
+                "alternatives": alternatives,
+                "existing_predictions": existing_predictions
+            }
+            
+        except Exception as e:
+            print(f"Error gathering research: {e}")
+            return None
+
     def _get_research(self, prompt: str) -> str:
-        """Make a research query using Perplexity."""
+        """
+        Make an API call to Perplexity for a research question.
+        
+        Args:
+            prompt: The research prompt
+            
+        Returns:
+            The research result or empty string if failed
+        """
         try:
             time_context = self._get_time_context()
             response = self.perplexity_client.chat.completions.create(
@@ -103,33 +152,27 @@ Please ensure all analysis and predictions are made with this current time conte
                 messages=[
                     {
                         "role": "system",
-                        "content": f"""You are a research assistant focused on providing accurate, well-sourced information. For token price questions, always include current price, recent price action, and market sentiment. Be direct and concise.
-
-{time_context}
-
-Always ensure your research and analysis is current and relevant to the present date.""",
+                        "content": f"""You are a finance and crypto market research assistant. 
+Use ONLY factual, verifiable information from credible sources.
+Focus on objective data, not opinions or speculation.
+Provide detailed, analytical answers with evidence.
+If information is unavailable, clearly state this.
+{time_context}"""
                     },
-                    {"role": "user", "content": f"{prompt}\n\nNote: Please consider the current date and time context in your analysis."},
+                    {
+                        "role": "user", 
+                        "content": prompt
+                    }
                 ],
+                temperature=0.1,
+                max_tokens=2000,
             )
+            
             return response.choices[0].message.content
+            
         except Exception as e:
-            print(f"Error in research query: {e}")
-            return f"Research failed: {str(e)}"
-
-    def _gather_research(self, question: str) -> Optional[ResearchResults]:
-        """Gather all research components."""
-        try:
-            return {
-                "context": self._research_context(question),
-                "factors": self._research_factors(question),
-                "dates": self._research_dates(question),
-                "alternatives": self._research_alternatives(question),
-                "existing_predictions": self._research_existing_predictions(question),
-            }
-        except Exception as e:
-            print(f"Error gathering research: {e}")
-            return None
+            print(f"Error making Perplexity request: {e}")
+            return ""
 
     def _research_context(self, question: str) -> str:
         """Research the general context and background."""
@@ -285,9 +328,19 @@ KEY PRICE LEVELS TO WATCH:
 - Volume zones: $[level 1], $[level 2]"""
 
     def _generate_prediction(
-        self, question: str, research: ResearchResults, system_prompt: Optional[str] = None
+        self, question: str, research: ResearchResults, system_prompt: Optional[str] = None, model: Optional[str] = None
     ) -> Optional[str]:
-        """Generate the final prediction using OpenAI."""
+        """Generate the final prediction using LiteLLM.
+
+        Args:
+            question: User's question/prompt
+            research: Compiled research results
+            system_prompt: Optional custom system prompt
+            model: Optional model to use (defaults to DEFAULT_MODEL)
+
+        Returns:
+            The prediction text or None if failed
+        """
         try:
             prompt = self._create_prediction_prompt(question, research)
             time_context = self._get_time_context()
@@ -300,19 +353,13 @@ Always provide specific price targets with clear ranges. If uncertain, explain t
 
 If your confidence level is 4 or lower, start your response with a note suggesting the user to provide more context about the token/project (e.g., full project name, website, or other identifying information) to get a more accurate prediction."""
 
-            completion = self.openai_client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": system_prompt if system_prompt else default_system_prompt,
-                    },
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0.7,
+            # Use the LiteLLM utility for completion instead of direct OpenAI call
+            return generate_completion(
+                prompt=prompt,
+                system_prompt=system_prompt if system_prompt else default_system_prompt,
+                model=model,
+                temperature=0.7
             )
-
-            return completion.choices[0].message.content
 
         except Exception as e:
             print(f"Error generating prediction: {e}")
@@ -320,5 +367,5 @@ If your confidence level is 4 or lower, start your response with a note suggesti
 
 
 # added the following to have uniformity in the way we call tools
-def run(prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
-    return PricePredictor().run(prompt, system_prompt)
+def run(prompt: str, system_prompt: Optional[str] = None, model: Optional[str] = None) -> Dict[str, Any]:
+    return PricePredictor().run(prompt, system_prompt, model)

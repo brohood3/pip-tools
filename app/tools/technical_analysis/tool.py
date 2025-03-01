@@ -30,6 +30,12 @@ import base64
 from dataclasses import dataclass
 from enum import Enum
 from .chart_generator import ChartGenerator
+from app.utils.config import DEFAULT_MODEL
+
+# Constants for technical analysis
+DEFAULT_TIMEFRAME = "1d"
+DEFAULT_STRATEGY = "trend_following"
+VALID_TIMEFRAMES = ["1m", "5m", "15m", "30m", "1h", "2h", "4h", "12h", "1d", "1w"]
 
 # Load environment variables
 load_dotenv()
@@ -743,8 +749,10 @@ class TechnicalAnalysis:
             
             # Extract analysis parameters from prompt
             analysis_params = self.parse_prompt_with_llm(prompt)
+            
+            # Check if a token was specified
             if not analysis_params["token"]:
-                return {"error": "Could not determine which token to analyze. Please specify a token."}
+                return {"error": "No cryptocurrency token was detected in your request. Please specify which cryptocurrency you'd like to analyze (e.g., BTC, ETH, SOL, ADA, etc.). For example: 'Analyze BTC price action on the daily timeframe' or 'Check support levels for Ethereum on the 4h chart'."}
 
             # Get available symbols and find match
             available_symbols = self.get_available_symbols_sync()
@@ -753,7 +761,7 @@ class TechnicalAnalysis:
 
             symbol = self.find_best_pair(analysis_params["token"], available_symbols)
             if not symbol:
-                return {"error": f"No coin found for {analysis_params['token']}. Please verify the token symbol and try again."}
+                return {"error": f"No coin found for {analysis_params['token']}. Please verify the token symbol and try again with one of these popular tokens: BTC, ETH, SOL, ADA, DOGE, XRP, AVAX, MATIC."}
 
             # Fetch indicators
             indicators = self._fetch_indicators(
@@ -815,159 +823,151 @@ class TechnicalAnalysis:
             return {"error": str(e)}
 
     def parse_prompt_with_llm(self, prompt: str) -> PromptAnalysis:
-        """Extract analysis parameters from the user's prompt using GPT.
-
-        Uses GPT to intelligently parse the user's natural language request and extract
-        key parameters needed for technical analysis, including:
-        - Token/Symbol to analyze
-        - Timeframe for analysis
-        - Relevant technical indicators
-        - Trading strategy type
-        - Analysis focus areas
+        """Extract key information from user prompt using GPT-4.
 
         Args:
-            prompt (str): User's analysis request in natural language
+            prompt: The user's prompt requesting technical analysis
 
         Returns:
-            PromptAnalysis: Structured analysis parameters including token, timeframe,
-                          indicators, strategy type, and analysis focus
-
-        Raises:
-            HTTPException: If there's an error parsing the trading request
+            Dictionary containing extracted parameters
         """
         try:
-            context = f"""Analyze the following trading analysis request and extract key parameters.
-Consider the following aspects:
-1. Token/Symbol to analyze
-2. Timeframe for analysis
-3. Relevant technical indicators based on the analysis needs
-4. Type of trading strategy suggested by the request
-5. Main focus areas for the analysis
+            # Design the analysis prompt - using regular string instead of f-string for the example
+            context = f"""Analyze this technical analysis request: "{prompt}"
 
-Available Technical Indicators by Category:
+Extract the following information if present in the user's request:
 
-Trend Indicators:
-- Moving Averages: SMA, EMA, DEMA, TEMA, VWMA (periods: 20, 50, 200)
-- Trend Direction: Supertrend, ADX, DMI, Vortex
-- Complex: Ichimoku Cloud, Williams Alligator
+1. Cryptocurrency token/symbol mentioned (return value like "BTC" or "ETH", default to null if not mentioned)
+2. Timeframe for analysis (valid values: 1m, 5m, 15m, 30m, 1h, 2h, 4h, 12h, 1d, 1w; default to "1d" if not specified)
+3. Technical indicators to use (valid indicators: sma, ema, dema, tema, vwma, supertrend, adx, dmi, vortex, volume, mfi, obv, stddev, atr, macd, rsi, stoch, bbands, fibonacci, ichimoku; include both explicitly mentioned indicators AND indicators that would be appropriate for the analysis)
+4. Trading strategy type mentioned (valid strategies: trend_following, mean_reversion, breakout, momentum, range_trading, or default to "trend_following" if not specified)
+5. Analysis focus areas (valid areas: price_action, trend, momentum, volume, volatility; include all relevant areas)
 
-Momentum Indicators:
-- Oscillators: RSI, Stochastic, StochRSI
-- MACD, CCI, MFI
-- Awesome Oscillator (AO)
-- Ultimate Oscillator
-- Williams %R
+Respond with a valid JSON object ONLY containing these fields: token, timeframe, indicators (as array), strategy_type, analysis_focus (as array)."""
 
-Volume/Money Flow:
-- Volume
-- On-Balance Volume (OBV)
-- Chaikin Money Flow (CMF)
-- Volume Weighted Average Price (VWAP)
-- Ease of Movement (EOM)
+            # Set up a structured system prompt
+            system_prompt = """You are an expert at extracting technical analysis parameters from user requests.
 
-Volatility Indicators:
-- Bollinger Bands
-- ATR (Average True Range)
-- Standard Deviation
-- Keltner Channels
-- Donchian Channels
+For the 'token' field:
+- Extract the cryptocurrency symbol (like BTC, ETH, SOL) if explicitly mentioned
+- If the user mentions a full name like "Bitcoin", convert it to the symbol "BTC"
+- If the user mentions a full name like "Ethereum", convert it to the symbol "ETH" 
+- If the user mentions a full name like "Solana", convert it to the symbol "SOL"
+- If no token is mentioned at all, return null for the token field
 
-Price Action:
-- Support/Resistance
-- Fibonacci Retracements
-- Pivot Points
-- Price Channels
-- Candlestick Patterns
+For the 'indicators' field:
+- Include indicators explicitly mentioned by the user
+- IMPORTANTLY, also include indicators that would be appropriate for the requested analysis based on your technical analysis expertise
+- For example, if the user wants trend analysis, include trend indicators like moving averages, ADX, and supertrend
+- If the user wants volatility analysis, include Bollinger Bands, ATR, and standard deviation
+- If the user wants momentum analysis, include RSI, MACD, and stochastic oscillators
+- If the user mentions support/resistance, include price levels and volume profile
+- Ensure you select a comprehensive set of indicators that will provide valuable insights for the specific analysis requested
 
-Valid timeframes are: 1m, 5m, 15m, 30m, 1h, 2h, 4h, 12h, 1d, 1w
+For the 'strategy_type' field:
+- Determine the most appropriate strategy type based on the user's request
+- If a user mentions "reversals" or "oversold/overbought", use "mean_reversion"
+- If a user mentions "support/resistance" or "consolidation", use "range_trading"
+- If a user mentions "trends" or "following the trend", use "trend_following"
+- If a user mentions "breakouts", use "breakout"
+- If a user mentions "momentum" or "strength", use "momentum"
 
-Strategy Types:
-- trend_following
-- momentum
-- mean_reversion
-- breakout
-- volatility
-- swing_trading
-- pattern_trading
-- volatility_trading
+For the 'analysis_focus' field:
+- Include all focus areas relevant to the user's request
+- Ensure comprehensive coverage of what the user is likely interested in
 
-Example inputs and outputs:
-Input: "give me a trend analysis for Bitcoin"
-Output: {{
-    "token": "BTC",
-    "timeframe": "1d",
-    "indicators": ["sma", "ema", "supertrend", "adx", "dmi", "vortex"],
-    "strategy_type": "trend_following",
-    "analysis_focus": ["trend", "price_action"]
-}}
+Return a valid JSON object containing exactly these fields: token, timeframe, indicators, strategy_type, analysis_focus.
+"""
 
-Input: "analyze ETH momentum on 4 hour timeframe with volume analysis"
-Output: {{
-    "token": "ETH",
-    "timeframe": "4h",
-    "indicators": ["macd", "rsi", "ao", "cmf", "vwap", "volume"],
-    "strategy_type": "momentum",
-    "analysis_focus": ["momentum", "volume"]
-}}
-
-Input: "what's your view on NEAR for scalping with volatility focus"
-Output: {{
-    "token": "NEAR",
-    "timeframe": "5m",
-    "indicators": ["bbands", "atr", "stoch", "volume", "mfi"],
-    "strategy_type": "volatility",
-    "analysis_focus": ["volatility", "momentum", "price_action"]
-}}
-
-Input: "need breakout setup for SOL/USDT with volume confirmation"
-Output: {{
-    "token": "SOL",
-    "timeframe": "15m",
-    "indicators": ["donchian", "volume", "obv", "vwap", "atr"],
-    "strategy_type": "breakout",
-    "analysis_focus": ["price_action", "volume", "volatility"]
-}}
-
-Now analyze this request: "{prompt}"
-
-IMPORTANT: Respond with ONLY the raw JSON object. Do not include markdown formatting, code blocks, or any other text. The response should start with {{ and end with }}."""
-
-            response = self.openai_client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are a trading expert that analyzes trading requests and extracts key parameters. Always respond with a valid JSON object containing all required fields.",
+            # Define the JSON schema for the response
+            json_schema = {
+                "type": "OBJECT",
+                "properties": {
+                    "token": {"type": "STRING"},
+                    "timeframe": {"type": "STRING"},
+                    "indicators": {
+                        "type": "ARRAY",
+                        "items": {"type": "STRING"}
                     },
-                    {"role": "user", "content": context},
-                ],
-                temperature=0,
+                    "strategy_type": {"type": "STRING"},
+                    "analysis_focus": {
+                        "type": "ARRAY",
+                        "items": {"type": "STRING"}
+                    }
+                },
+                "required": ["token", "timeframe", "indicators", "strategy_type", "analysis_focus"]
+            }
+
+            # Print debug information
+            print(f"\nParsing prompt: {prompt}")
+            
+            # Use the LiteLLM utility for completion with JSON mode
+            from app.utils.llm import generate_completion
+            
+            response_text = generate_completion(
+                prompt=context,
+                system_prompt=system_prompt,
+                model=DEFAULT_MODEL,
+                temperature=0.3,  # Slightly increased temperature for more creativity
+                json_mode=True,
+                json_schema=json_schema
             )
 
-            response_text = response.choices[0].message.content.strip()
+            # Print the raw response for debugging
+            print(f"Raw LLM response: {response_text}")
+            print(f"Response type: {type(response_text)}")
 
+            # Parse the JSON response
             try:
-                data = json.loads(response_text)
-                return PromptAnalysis(
-                    token=data.get("token"),
-                    timeframe=data.get("timeframe", "1d"),
-                    indicators=set(data.get("indicators", [])),
-                    strategy_type=data.get("strategy_type", "trend_following"),
-                    analysis_focus=data.get("analysis_focus", ["price_action"])
-                )
-            except json.JSONDecodeError:
-                return PromptAnalysis(
-                    token=None,
-                    timeframe="1d",
-                    indicators=set(["sma", "ema", "macd", "rsi"]),  # Default indicators
-                    strategy_type="trend_following",
-                    analysis_focus=["price_action"]
-                )
+                # Check if the response is already a dictionary (some models might return parsed JSON)
+                if isinstance(response_text, dict):
+                    data = response_text
+                else:
+                    # Try to parse the response as JSON
+                    data = json.loads(response_text)
+                print(f"Parsed data: {data}")
+            except json.JSONDecodeError as e:
+                # Fallback for parsing errors
+                print(f"Error parsing JSON: {response_text}")
+                print(f"JSON error details: {str(e)}")
+                return {
+                    "token": None,
+                    "timeframe": DEFAULT_TIMEFRAME,
+                    "indicators": set(),
+                    "strategy_type": DEFAULT_STRATEGY,
+                    "analysis_focus": ["price_action", "trend", "momentum"]
+                }
+
+            # Convert indicators list to a set
+            indicators_set = set(data.get("indicators", []))
+
+            # Validate timeframe
+            timeframe = data.get("timeframe", DEFAULT_TIMEFRAME)
+            if timeframe not in VALID_TIMEFRAMES:
+                timeframe = DEFAULT_TIMEFRAME
+
+            # Return structured data with token potentially being None
+            result = {
+                "token": data.get("token"),  # This could be None if no token was mentioned
+                "timeframe": timeframe,
+                "indicators": indicators_set,
+                "strategy_type": data.get("strategy_type", DEFAULT_STRATEGY),
+                "analysis_focus": data.get("analysis_focus", ["price_action", "trend", "momentum"])
+            }
+            print(f"Final analysis parameters: {result}")
+            return result
 
         except Exception as e:
-            raise HTTPException(
-                status_code=500, detail=f"Error parsing trading request: {str(e)}"
-            )
+            print(f"Error parsing prompt: {e}")
+            import traceback
+            traceback.print_exc()
+            return {
+                "token": None,  # No default token on error
+                "timeframe": DEFAULT_TIMEFRAME,
+                "indicators": set(),
+                "strategy_type": DEFAULT_STRATEGY,
+                "analysis_focus": ["price_action", "trend", "momentum"]
+            }
 
     def find_best_pair(self, token: str, available_symbols: List[str]) -> Optional[str]:
         """Find the best matching coin symbol.
@@ -1609,51 +1609,77 @@ IMPORTANT: Respond with ONLY the raw JSON object. Do not include markdown format
         user_prompt: str, system_prompt: Optional[str] = None,
         strategy_type: str = DEFAULT_STRATEGY, analysis_focus: List[str] = None
     ) -> str:
-        """Generate a comprehensive technical analysis using GPT-4."""
+        """Generate a detailed technical analysis based on indicators and user request.
+
+        Args:
+            indicators: Dictionary containing technical indicator values
+            symbol: The trading symbol (e.g., 'BTC/USDT')
+            timeframe: The analysis timeframe (e.g., '1d', '4h')
+            user_prompt: The original user request
+            system_prompt: Optional system prompt to override default behavior
+            strategy_type: Type of trading strategy to focus on
+            analysis_focus: List of technical analysis aspects to focus on
+
+        Returns:
+            A detailed technical analysis as a string
+        """
         try:
-            time_horizon = INTERVAL_HORIZONS.get(timeframe, "medium-term")
+            # Format the indicators as a clean JSON string
+            indicators_data = self.format_indicators_json(indicators)
+            selected_indicators = self._get_selected_indicators(indicators)
             
-            if not system_prompt:
-                system_prompt = """You are an expert technical analyst with a comprehensive view of market structure. Your goal is to provide clear, actionable insights that cover both immediate trading opportunities and longer-term price targets. When analyzing support and resistance levels: 1. ALWAYS mention both near-term and far-term levels 2. Include multiple take-profit targets at key resistance/support zones 3. Don't be overly conservative - if there are significant levels far from current price, include them 4. Explain your rationale for both conservative and aggressive targets Focus on being clear and natural in your explanations, avoiding rigid structures unless they serve the analysis."""
-
-            # Format indicators for better readability
-            formatted_indicators = json.dumps(indicators, indent=2)
-            print("\nDebug - Indicators being passed to LLM:")
-            print(formatted_indicators)
+            # If no analysis focus provided, use a default set
+            if not analysis_focus:
+                analysis_focus = ["price_action", "trend", "momentum", "volume", "volatility"]
             
-            analysis_request = f"""I need your expert analysis on {symbol} (USD) on the {timeframe} timeframe, which typically suits {time_horizon} trading horizons. The user's original question was: "{user_prompt}"
+            # Define the instruction prompt
+            prompt = f"""Generate a detailed technical analysis for {symbol} on the {timeframe} timeframe.
 
-The analysis should naturally flow from your expertise, but keep these key points in mind:
-- Always discuss BOTH immediate price levels and significant far-out levels that could be important
-- When suggesting targets, include a range from conservative near-term to aggressive longer-term targets
-- Support your analysis with the relevant indicators, explaining which signals you find most compelling
-- If you see significant levels far from the current price, don't hesitate to mention them - traders need to know both immediate opportunities and bigger picture targets
-- Consider high-volume price zones as potential targets, especially where they align with other technical levels
+Original request: "{user_prompt}"
 
-Here are the technical indicators I've calculated for your analysis:
+Strategy focus: {strategy_type}
+Analysis focus: {', '.join(analysis_focus)}
 
-{formatted_indicators}
+Available indicators: {', '.join(sorted(selected_indicators))}
 
-Please provide your comprehensive analysis, keeping in mind the original question while ensuring you cover both near-term opportunities and longer-term potential."""
+Technical data:
+{json.dumps(indicators_data, indent=2)}
+
+Your analysis should include:
+1. Overall Market Structure: Identify key price action patterns, trend direction, and significant support/resistance levels
+2. Indicator Analysis: Interpret the indicators in the context of the current market
+3. Potential Entry/Exit Points: Identify optimal entry and exit points with specific price levels
+4. Risk Management: Suggest appropriate stop-loss and take-profit levels
+5. Confidence Level: Express confidence in your analysis on a scale of 1-10 
+6. Alternative Scenarios: Briefly describe what could invalidate your analysis
+
+Include specific price levels, indicator values, and percentage changes where relevant.
+Make your analysis actionable by providing clear trading guidance."""
+
+            default_system_prompt = f"""You are an expert technical analyst with deep knowledge of cryptocurrency markets and technical indicators.
+
+Your approach is based on {strategy_type} principles, with emphasis on {', '.join(analysis_focus)}.
+
+You analyze the provided data and deliver clear, specific insights without general market commentary.
+Focus on what the data shows now, not on making general statements about the token or market.
+
+Your analysis should be balanced, detailed, and technically sound. Include both bullish and bearish perspectives.
+When mentioning indicator values, support/resistance, or price targets, provide specific numbers.
+"""
+
+            # Use generate_completion from LiteLLM utility instead of direct OpenAI call
+            from app.utils.llm import generate_completion
             
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": analysis_request}
-            ]
-
-            response = self.openai_client.chat.completions.create(
-                model="gpt-4o",
-                messages=messages,
-                temperature=0.7,
-                max_tokens=1500
+            return generate_completion(
+                prompt=prompt,
+                system_prompt=system_prompt if system_prompt else default_system_prompt,
+                model=DEFAULT_MODEL,
+                temperature=0.7
             )
-
-            return response.choices[0].message.content
 
         except Exception as e:
-            raise HTTPException(
-                status_code=500, detail=f"Error generating analysis: {str(e)}"
-            )
+            print(f"Error generating analysis: {e}")
+            return "Error generating technical analysis. Please try again."
 
     def _get_selected_indicators(self, indicators: Dict[str, Any]) -> Set[str]:
         """Extract the list of indicators used in the analysis."""

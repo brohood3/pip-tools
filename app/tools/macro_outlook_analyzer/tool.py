@@ -153,12 +153,17 @@ Please create a detailed macro outlook report that includes:
 
 Focus on integrating the scores with CURRENT macro conditions to provide actionable insights."""
 
-        response = clients.perplexity_client.chat.completions.create(
-            model="sonar", 
-            messages=[{"role": "user", "content": prompt}]
-        )
+        # Use the LiteLLM utility instead of direct Perplexity API call
+        from app.utils.llm import generate_completion
         
-        return response.choices[0].message.content
+        system_prompt = "You are a senior macro analyst specializing in cryptocurrency markets. Your analysis integrates technical signals with macroeconomic trends to provide comprehensive market insights."
+        
+        return generate_completion(
+            prompt=prompt,
+            system_prompt=system_prompt,
+            model="perplexity/sonar",  # Use Perplexity's sonar model with provider prefix
+            temperature=0.7
+        )
         
     except Exception as e:
         print(f"Error generating macro outlook analysis: {e}")

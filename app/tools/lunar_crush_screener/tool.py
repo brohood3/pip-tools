@@ -12,12 +12,15 @@ import os
 import requests
 import math
 import json
+import re
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from dotenv import load_dotenv
 from openai import OpenAI
 from fastapi import HTTPException
 from pydantic import BaseModel, Field, validator
+from app.utils.config import DEFAULT_MODEL
+from app.utils.llm import generate_completion
 
 # Load environment variables
 load_dotenv()
@@ -317,15 +320,25 @@ class LunarCrushScreener:
         # Calculate slopes and store in coin data
         n_points = len(relevant_entries)
         
-        # Use .get() for now until we confirm the data structure
-        gs_first = relevant_entries[0].get("galaxy_score")
-        gs_last = relevant_entries[-1].get("galaxy_score")
-        alt_first = relevant_entries[0].get("alt_rank")
-        alt_last = relevant_entries[-1].get("alt_rank")
+        # Use .get() with default values to avoid NoneType errors
+        gs_first = relevant_entries[0].get("galaxy_score", 0)
+        gs_last = relevant_entries[-1].get("galaxy_score", 0)
+        alt_first = relevant_entries[0].get("alt_rank", 0)
+        alt_last = relevant_entries[-1].get("alt_rank", 0)
+        
+        # Skip if we don't have valid data
+        if gs_first is None or gs_last is None or alt_first is None or alt_last is None:
+            return False
+            
+        # Convert to numeric values with defaults if needed
+        gs_first = float(gs_first) if gs_first is not None else 0
+        gs_last = float(gs_last) if gs_last is not None else 0
+        alt_first = float(alt_first) if alt_first is not None else 0
+        alt_last = float(alt_last) if alt_last is not None else 0
         
         # Get sentiment and social dominance data - with fallbacks
-        sentiments = [pt.get("sentiment_score", pt.get("sentiment", 50)) for pt in relevant_entries]  # Try both possible keys
-        social_doms = [pt.get("social_dominance", 0) for pt in relevant_entries]
+        sentiments = [float(pt.get("sentiment_score", pt.get("sentiment", 50)) or 50) for pt in relevant_entries]  # Try both possible keys
+        social_doms = [float(pt.get("social_dominance", 0) or 0) for pt in relevant_entries]
         
         # Store slopes in coin data
         coin["metrics"] = {
@@ -367,113 +380,209 @@ class LunarCrushScreener:
         return summary
 
     def _get_llm_analysis(self, coins: List[Dict[str, Any]], system_prompt: Optional[str] = None, original_prompt: Optional[str] = None) -> str:
-        """Get LLM analysis of the screened coins."""
-        summary = self._generate_coin_summary(coins)
+        """Generate LLM analysis of screened coins."""
+        if not coins:
+            return "No coins matched the screening criteria."
         
-        if coins:
-            prompt = f"""
-            These cryptocurrencies have shown strong fundamental and sentiment signals in our screening:
-
-            {summary}
-
-            Analyze these opportunities and provide actionable insights. Consider market conditions, 
-            technical signals, and potential catalysts. Be specific but natural in your analysis.
-            Focus on what makes each opportunity interesting right now.
-            """
-        else:
-            prompt = f"""
-            Let the user know that no opportunities were found matching their criteria.
-
-            Your request: "{original_prompt}"
-
-            Current screening parameters:
-            - Galaxy Score Improvement: >= {self.SCORE_DIFF_THRESHOLD}
-            - AltRank Improvement: >= {self.ALTRANK_DIFF_THRESHOLD}
-            - Price Change 7d: < {self.MAX_7D_PRICE_CHANGE}%
-            - Price Change 24h: < {self.MAX_24H_PRICE_CHANGE}%
-            - Market Cap Range: ${self.MIN_MARKET_CAP:,.0f} - ${self.MAX_MARKET_CAP:,.0f}
-            - Minimum Volume 24h: ${self.MIN_VOLUME_24H:,.0f}
-            - Minimum Galaxy Score: {self.MIN_GALAXY_SCORE}
-            - Minimum GS Slope: {self.MIN_GS_SLOPE} points/day
-            - Minimum Sentiment: {self.MIN_SENTIMENT}%
-
-            Quick suggestions:
-            1. Which parameters are likely too strict?
-            2. What adjustments would find similar opportunities?
-            3. Alternative screening approaches?
-
-            Be brief and specific in your recommendations.
-            """
-
         try:
-            messages = [{"role": "user", "content": prompt}]
+            # Format coin data for LLM
+            coins_data = []
+            for coin in coins:
+                metrics = coin.get("metrics", {})
+                coin_data = {
+                    "name": coin.get("name", "Unknown"),
+                    "symbol": coin.get("symbol", "Unknown"),
+                    "price": coin.get("price", 0),
+                    "market_cap": coin.get("market_cap", 0),
+                    "volume_24h": coin.get("volume_24h", 0),
+                    "galaxy_score": coin.get("galaxy_score", 0),
+                    "galaxy_score_previous": coin.get("galaxy_score_previous", 0),
+                    "galaxy_score_diff": coin.get("galaxy_score", 0) - coin.get("galaxy_score_previous", 0),
+                    "alt_rank": coin.get("alt_rank", 0),
+                    "alt_rank_previous": coin.get("alt_rank_previous", 0),
+                    "alt_rank_diff": coin.get("alt_rank_previous", 0) - coin.get("alt_rank", 0),
+                    "price_change_24h": coin.get("percent_change_24h", 0),
+                    "price_change_7d": coin.get("percent_change_7d", 0),
+                    "social_score": coin.get("social_score", 0),
+                    "social_volume": coin.get("social_volume", 0),
+                    "social_dominance": coin.get("social_dominance", 0),
+                    "galaxy_score_slope": metrics.get("galaxy_score_slope", 0),
+                    "alt_rank_slope": metrics.get("alt_rank_slope", 0),
+                    "avg_sentiment": metrics.get("avg_sentiment", 0),
+                    "social_dom_change": metrics.get("social_dom_change", 0)
+                }
+                coins_data.append(coin_data)
             
-            # Use provided system prompt if available, otherwise use default
-            if system_prompt:
-                messages.insert(0, {"role": "system", "content": system_prompt})
-            else:
-                messages.insert(0, {
-                    "role": "system", 
-                    "content": "You are a cryptocurrency analyst with expertise in market screening and opportunity detection. Provide clear, actionable insights and help users refine their screening approach."
-                })
+            # Create prompt for analysis
+            prompt = f"""Analyze these cryptocurrency opportunities identified by our screener:
 
-            response = self.openai_client.chat.completions.create(
-                model="gpt-4o",
-                messages=messages,
-                temperature=0.8,
-                max_tokens=500
+{json.dumps(coins_data, indent=2)}
+
+Original user query: "{original_prompt if original_prompt else 'Find promising crypto opportunities'}"
+
+Provide a detailed analysis with:
+1. Overview of the most promising opportunities
+2. Key metrics that stand out for each coin
+3. Potential catalysts or reasons for increased social activity
+4. Comparative analysis between the identified coins
+5. Risk factors to consider
+6. Suggested next steps for further research
+
+Focus on actionable insights based on the social metrics, galaxy score trends, and price action."""
+
+            default_system_prompt = "You are a cryptocurrency analyst specializing in social metrics and momentum analysis. Provide detailed, actionable insights on emerging opportunities based on LunarCrush data."
+            
+            return generate_completion(
+                prompt=prompt,
+                system_prompt=system_prompt if system_prompt else default_system_prompt,
+                model=DEFAULT_MODEL,
+                temperature=0.7
             )
-            return response.choices[0].message.content
+            
         except Exception as e:
-            return f"Error getting LLM analysis: {str(e)}"
+            print(f"Error generating LLM analysis: {e}")
+            return f"Error generating analysis: {str(e)}"
 
     def _extract_config_from_prompt(self, prompt: str) -> LunarCrushScreenerConfig:
-        """Extract and validate configuration from prompt."""
-        config_prompt = f"""
-        Analyze this request and configure appropriate parameters: "{prompt}"
-
-        Available Metrics and Their Meaning:
-        - SCORE_DIFF_THRESHOLD: How much Galaxy Score has improved (higher = stronger recent momentum)
-        - ALTRANK_DIFF_THRESHOLD: How much AltRank has improved (higher = stronger rank gains)
-        - MIN_GALAXY_SCORE: Base Galaxy Score requirement (higher = stronger overall metrics)
-        - MIN_SENTIMENT: Community sentiment requirement (higher = more positive sentiment)
-        - MIN_GS_SLOPE: Rate of Galaxy Score improvement (higher = faster improvement)
-        - MIN_MARKET_CAP & MAX_MARKET_CAP: Market cap range (lower = smaller caps)
-        - MIN_VOLUME_24H: Trading volume requirement (higher = more liquid)
-        - MAX_24H_PRICE_CHANGE & MAX_7D_PRICE_CHANGE: Price movement limits (lower = less volatile)
-
-        All parameters start at 0 (disabled). Analyze the request and set appropriate values based on:
-        1. Explicit requirements (e.g., "market cap between 1M and 100M")
-        2. Implied requirements (e.g., "early opportunities" → lower market cap, improving metrics)
-        3. Risk preferences (e.g., "safe picks" → higher minimum scores, lower volatility)
-
-        Return a ONLY JSON object with the parameters you want to modify. Example:
-        {{
-            "MIN_MARKET_CAP": 1000000,
-            "MAX_MARKET_CAP": 100000000,
-            "MIN_VOLUME_24H": 500000,
-            "SCORE_DIFF_THRESHOLD": 5.0
-        }}
-        """
+        """Extract configuration parameters from the user prompt using LLM."""
+        # Default configuration
+        default_config = LunarCrushScreenerConfig()
         
+        # If prompt is empty or too short, return default config
+        if not prompt or len(prompt.strip()) < 10:
+            return default_config
+            
         try:
-            response = self.openai_client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {
-                        "role": "system", 
-                        "content": "You are a cryptocurrency screening expert. Analyze requests and configure optimal parameters for finding opportunities. Return only valid JSON."
-                    },
-                    {"role": "user", "content": config_prompt}
-                ],
-                temperature=0.5  
+            # Create prompt for parameter extraction
+            extraction_prompt = f"""Extract screening parameters from this request: "{prompt}"
+
+Valid parameters:
+- SCORE_DIFF_THRESHOLD: Minimum Galaxy Score improvement (default: {default_config.SCORE_DIFF_THRESHOLD})
+- ALTRANK_DIFF_THRESHOLD: Minimum AltRank improvement (default: {default_config.ALTRANK_DIFF_THRESHOLD})
+- MAX_7D_PRICE_CHANGE: Maximum 7-day price change allowed (default: {default_config.MAX_7D_PRICE_CHANGE})
+- MAX_24H_PRICE_CHANGE: Maximum 24-hour price change allowed (default: {default_config.MAX_24H_PRICE_CHANGE})
+- MIN_MARKET_CAP: Minimum market capitalization (default: {default_config.MIN_MARKET_CAP})
+- MAX_MARKET_CAP: Maximum market capitalization (default: {default_config.MAX_MARKET_CAP})
+- MIN_VOLUME_24H: Minimum 24-hour trading volume (default: {default_config.MIN_VOLUME_24H})
+- MIN_GALAXY_SCORE: Minimum Galaxy Score (default: {default_config.MIN_GALAXY_SCORE})
+- MIN_GS_SLOPE: Minimum Galaxy Score slope (default: {default_config.MIN_GS_SLOPE})
+- MIN_SENTIMENT: Minimum sentiment score (default: {default_config.MIN_SENTIMENT})
+
+Respond with a valid JSON object containing only the parameters that should be changed from defaults. For example:
+{{"SCORE_DIFF_THRESHOLD": 5.0, "MIN_MARKET_CAP": 10000000}}
+
+If no parameters should be changed, respond with an empty JSON object: {{}}.
+
+IMPORTANT: Only include parameters that are explicitly mentioned or clearly implied in the request. Do not make assumptions about parameters that aren't mentioned."""
+
+            system_prompt = "You are a parameter extraction assistant. Extract only the parameters explicitly mentioned or clearly implied in the request. Respond with a valid JSON object containing only the parameters that should be changed from defaults."
+            
+            # Define JSON schema for the response
+            json_schema = {
+                "type": "OBJECT",
+                "properties": {
+                    "SCORE_DIFF_THRESHOLD": {"type": "NUMBER"},
+                    "ALTRANK_DIFF_THRESHOLD": {"type": "NUMBER"},
+                    "MAX_7D_PRICE_CHANGE": {"type": "NUMBER"},
+                    "MAX_24H_PRICE_CHANGE": {"type": "NUMBER"},
+                    "MIN_MARKET_CAP": {"type": "NUMBER"},
+                    "MAX_MARKET_CAP": {"type": "NUMBER"},
+                    "MIN_VOLUME_24H": {"type": "NUMBER"},
+                    "MIN_GALAXY_SCORE": {"type": "NUMBER"},
+                    "MIN_GS_SLOPE": {"type": "NUMBER"},
+                    "MIN_SENTIMENT": {"type": "NUMBER"},
+                    "check_social_dom": {"type": "BOOLEAN"}
+                }
+            }
+            
+            # Print debug information
+            print(f"Extracting config from prompt: {prompt}")
+            
+            response_text = generate_completion(
+                prompt=extraction_prompt,
+                system_prompt=system_prompt,
+                model=DEFAULT_MODEL,
+                temperature=0.1,
+                json_mode=True,
+                json_schema=json_schema
             )
             
-            config = LunarCrushScreenerConfig.parse_raw(response.choices[0].message.content)
-            return config
+            # Print the raw response for debugging
+            print(f"Raw LLM response: {response_text}")
+            print(f"Response type: {type(response_text)}")
+            
+            # Process the response
+            try:
+                # Check if the response is already a dictionary (some models might return parsed JSON)
+                if isinstance(response_text, dict):
+                    params = response_text
+                else:
+                    # Clean up the response text to handle potential formatting issues
+                    if response_text and isinstance(response_text, str):
+                        # Remove markdown code blocks if present
+                        if '```' in response_text:
+                            # Extract just the JSON part
+                            start = response_text.find('{')
+                            end = response_text.rfind('}') + 1
+                            if start >= 0 and end > start:
+                                response_text = response_text[start:end]
+                        
+                        # Remove any leading/trailing whitespace
+                        response_text = response_text.strip()
+                        
+                        # Ensure it starts with { and ends with }
+                        if not (response_text.startswith('{') and response_text.endswith('}')):
+                            print(f"Invalid JSON format: {response_text}")
+                            return default_config
+                    
+                    # Try to parse the response as JSON
+                    params = json.loads(response_text)
+                
+                print(f"Parsed parameters: {params}")
+                
+                # Validate numeric parameters
+                for key, value in list(params.items()):
+                    if key in ["SCORE_DIFF_THRESHOLD", "ALTRANK_DIFF_THRESHOLD", "MAX_7D_PRICE_CHANGE", 
+                              "MAX_24H_PRICE_CHANGE", "MIN_MARKET_CAP", "MAX_MARKET_CAP", 
+                              "MIN_VOLUME_24H", "MIN_GALAXY_SCORE", "MIN_GS_SLOPE", "MIN_SENTIMENT"]:
+                        try:
+                            # Convert to float if it's a string or int
+                            if isinstance(value, (str, int)):
+                                params[key] = float(value)
+                            # Ensure it's a number
+                            elif not isinstance(value, float):
+                                print(f"Invalid value for {key}: {value}, removing")
+                                del params[key]
+                        except (ValueError, TypeError):
+                            print(f"Error converting {key}: {value} to float, removing")
+                            del params[key]
+                
+                # Create config with extracted parameters
+                config = LunarCrushScreenerConfig.parse_obj({**default_config.dict(), **params})
+                print(f"Final config: {config}")
+                return config
+                
+            except json.JSONDecodeError as e:
+                print(f"Error parsing JSON from response: {response_text}, Error: {str(e)}")
+                # Try to salvage the response by using regex to extract key-value pairs
+                try:
+                    if isinstance(response_text, str):
+                        # Simple regex to extract key-value pairs
+                        pattern = r'"([^"]+)":\s*([0-9.]+)'
+                        matches = re.findall(pattern, response_text)
+                        if matches:
+                            params = {key: float(value) for key, value in matches}
+                            return LunarCrushScreenerConfig.parse_obj({**default_config.dict(), **params})
+                except Exception as regex_error:
+                    print(f"Error extracting parameters with regex: {str(regex_error)}")
+                
+                return default_config
             
         except Exception as e:
-            return LunarCrushScreenerConfig()
+            print(f"Error extracting config from prompt: {e}")
+            import traceback
+            traceback.print_exc()
+            return default_config
 
 # Function to match the interface pattern of other tools
 def run(prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:

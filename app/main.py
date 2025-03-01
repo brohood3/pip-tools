@@ -8,6 +8,7 @@ from app.models.api import PromptRequest, ToolSelectorRequest
 from app.tools.helpers import TOOLS, TOOL_TO_MODULE
 from app.utils.errors import ToolNotFoundError, AppError
 from app.utils.logging import logger
+from app.utils.config import DEFAULT_MODEL, get_model_provider
 
 app = FastAPI(title="Trading Tools API", docs_url="/docs", redoc_url="/redoc")
 
@@ -59,7 +60,19 @@ async def list_tools():
 async def run_tool_selector(request: ToolSelectorRequest):
     """Special endpoint for tool selector that supports filtering available tools"""
     tool = TOOL_TO_MODULE["tool_selector"]
-    result = tool.run(request.prompt, request.system_prompt, allowed_tools=request.allowed_tools)
+    
+    # Use the model from the request or fallback to default
+    model = request.model or DEFAULT_MODEL
+    
+    # Log the model being used
+    logger.info(f"Using model: {model} (provider: {get_model_provider(model)})")
+    
+    result = tool.run(
+        request.prompt, 
+        request.system_prompt, 
+        allowed_tools=request.allowed_tools,
+        model=model
+    )
     return {"result": result}
 
 @app.post("/{tool_name}")
@@ -78,8 +91,19 @@ async def run_tool(tool_name: str, prompt_request: PromptRequest, request: Reque
     # Get the base URL from the request
     base_url = str(request.base_url).rstrip('/')
     
-    # Run the tool (no base_url parameter needed)
-    result = tool.run(prompt_request.prompt, prompt_request.system_prompt)
+    # Use the model from the request or fallback to default
+    model = prompt_request.model or DEFAULT_MODEL
+    
+    # Log the model being used
+    logger.info(f"Using model: {model} (provider: {get_model_provider(model)})")
+    
+    # Run the tool with the model parameter
+    # Check if the tool's run function accepts a model parameter
+    if hasattr(tool, "run") and "model" in tool.run.__code__.co_varnames:
+        result = tool.run(prompt_request.prompt, prompt_request.system_prompt, model=model)
+    else:
+        # Fallback for tools that don't yet support model parameter
+        result = tool.run(prompt_request.prompt, prompt_request.system_prompt)
     
     # Handle chart data for tools that generate charts
     if tool_name_lower in ["technical_analysis", "synth_chart_generator"] and "chart" in result:

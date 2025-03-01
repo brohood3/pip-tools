@@ -13,6 +13,8 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from fastapi import HTTPException
 import requests
+from app.utils.config import DEFAULT_MODEL
+from app.utils.llm import generate_completion
 
 # Load environment variables
 load_dotenv()
@@ -122,19 +124,14 @@ Now extract from this request: "{prompt}"
 
 IMPORTANT: Respond with ONLY the raw JSON object. Do not include markdown formatting, code blocks, or any other text. The response should start with {{ and end with }}."""
 
-            response = self.openai_client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are a trading expert that extracts token names and timeframes from analysis requests. Always respond with a valid JSON object.",
-                    },
-                    {"role": "user", "content": context},
-                ],
+            system_prompt = "You are a trading expert that extracts token names and timeframes from analysis requests. Always respond with a valid JSON object."
+            
+            response_text = generate_completion(
+                prompt=context,
+                system_prompt=system_prompt,
                 temperature=0,
+                json_mode=True
             )
-
-            response_text = response.choices[0].message.content.strip()
 
             try:
                 data = json.loads(response_text)
@@ -332,19 +329,15 @@ Example good responses:
 
 IMPORTANT: Count words carefully. Hyphenated terms count as one word. Numbers count as one word."""
 
-            response = self.openai_client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": system_prompt or "You are a precise technical analyst who provides exactly ten-word analyses. You always include price targets based on technical indicators.",
-                    },
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0.7,
+            default_system_prompt = "You are a precise technical analyst who provides exactly ten-word analyses. You always include price targets based on technical indicators."
+            
+            response = generate_completion(
+                prompt=prompt,
+                system_prompt=system_prompt or default_system_prompt,
+                temperature=0.7
             )
 
-            return response.choices[0].message.content.strip()
+            return response
 
         except Exception as e:
             print(f"\nError generating analysis: {str(e)}")
