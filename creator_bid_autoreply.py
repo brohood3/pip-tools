@@ -21,7 +21,6 @@ START_SINCE_TWEET_ID = ensure_var("START_SINCE_TWEET_ID", None, is_required=Fals
 # Define which tools this bot has access to
 ALLOWED_TOOLS = [
     "tool_selector",
-    "research_assistant",
     "price_predictor",
     "fundamental_analysis_venice",
     "technical_analysis",
