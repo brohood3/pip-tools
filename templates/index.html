@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eolas - AI Chat</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.1/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+    
+    <!-- ReOwn AppKit Dependencies -->
+    <script type="module" src="{{ url_for('static', filename='js/web3auth.js') }}"></script>
+</head>
+<body>
+    <div id="auth-container" class="auth-container">
+        <div class="auth-card">
+            <div class="logo-container">
+                <i class="fa-solid fa-robot"></i>
+                <h1>Eolas</h1>
+            </div>
+            <h2>Web3 Authentication</h2>
+            <p>Connect your wallet to access the Eolas AI Chat.</p>
+            
+            <!-- Web3 Connect Button (provided by ReOwn AppKit) -->
+            <div id="wallet-connect-container">
+                <w3m-button></w3m-button>
+            </div>
+            
+            <div id="wallet-status" class="wallet-status"></div>
+        </div>
+    </div>
+
+    <div class="app-container" id="app-container" style="display: none;">
+        <header class="app-header">
+            <div class="logo">
+                <i class="fa-solid fa-robot"></i>
+                <h1>Eolas</h1>
+            </div>
+            <div class="header-controls">
+                <button id="toggleTools" class="header-btn">
+                    <i class="fa-solid fa-wrench"></i>
+                    <span>Tools: On</span>
+                </button>
+                <div class="model-selector">
+                    <i class="fa-solid fa-microchip"></i>
+                    <select id="modelSelect">
+                        <option value="gpt-4o">GPT-4o</option>
+                        <option value="gpt-4o-mini">GPT-4o Mini</option>
+                        <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                    </select>
+                </div>
+                <button id="clearChat" class="header-btn">
+                    <i class="fa-solid fa-trash"></i>
+                    <span>Clear</span>
+                </button>
+                <button id="disconnect" class="header-btn">
+                    <i class="fa-solid fa-sign-out-alt"></i>
+                    <span>Disconnect</span>
+                </button>
+            </div>
+        </header>
+
+        <main class="chat-container">
+            <div id="messageContainer" class="message-container">
+                <div class="message system">
+                    <div class="message-content">
+                        <p>Hello, I'm Eolas. How can I assist you today?</p>
+                    </div>
+                </div>
+                <!-- Messages will be added here dynamically -->
+            </div>
+
+            <div class="status-bar" id="statusBar">
+                <div id="typingIndicator" class="typing-indicator hide">
+                    <span></span><span></span><span></span>
+                </div>
+                <div id="statusText">Ready</div>
+                <div id="tokenCounter">Tokens: 0</div>
+            </div>
+
+            <div class="input-container">
+                <textarea 
+                    id="userInput" 
+                    placeholder="Type your message here..." 
+                    rows="1"
+                    autofocus
+                ></textarea>
+                <button id="sendButton" type="button">
+                    <i class="fa-solid fa-paper-plane"></i>
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+</body>
+</html> 

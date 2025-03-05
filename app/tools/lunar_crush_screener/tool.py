@@ -413,22 +413,11 @@ class LunarCrushScreener:
                 }
                 coins_data.append(coin_data)
             
-            # Create prompt for analysis
-            prompt = f"""Analyze these cryptocurrency opportunities identified by our screener:
-
-{json.dumps(coins_data, indent=2)}
-
-Original user query: "{original_prompt if original_prompt else 'Find promising crypto opportunities'}"
-
-Provide a detailed analysis with:
-1. Overview of the most promising opportunities
-2. Key metrics that stand out for each coin
-3. Potential catalysts or reasons for increased social activity
-4. Comparative analysis between the identified coins
-5. Risk factors to consider
-6. Suggested next steps for further research
-
-Focus on actionable insights based on the social metrics, galaxy score trends, and price action."""
+            # Create information string containing all the gathered data
+            information = json.dumps(coins_data, indent=2)
+            
+            # Create prompt using the user's initial prompt
+            prompt = f"""Given the following prompt: "{original_prompt if original_prompt else 'Find promising crypto opportunities'}" create a reply to that prompt using the following information: "{information}" """
 
             default_system_prompt = "You are a cryptocurrency analyst specializing in social metrics and momentum analysis. Provide detailed, actionable insights on emerging opportunities based on LunarCrush data."
             

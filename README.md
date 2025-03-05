@@ -1,127 +1,67 @@
-# Trading Tools API with LiteLLM Integration
+# Eolas AI Chat Web App
 
-This project provides a collection of trading analysis tools via a FastAPI backend, with flexible model configuration using LiteLLM.
+A modern, responsive web-based chat interface for interacting with OpenAI models with optional tool integrations.
 
 ## Features
 
-- **Multiple Trading Tools**: Technical analysis, fundamental analysis, price prediction, and more
-- **Flexible Model Configuration**: Use any supported LLM provider through LiteLLM
-- **Standardized API**: Consistent interface for all tools
+- Clean, modern UI with responsive design
+- Real-time typing indicators and status updates via WebSockets
+- Markdown and code syntax highlighting support
+- Optional integration with trading analysis tools
+- Token usage tracking
+- Model selection (GPT-4o, GPT-4o Mini, GPT-3.5 Turbo)
+- Tools on/off toggle
 
-## Model Configuration
+## Requirements
 
-The application uses LiteLLM to provide a unified interface for working with different LLM providers. This allows you to:
+- Python 3.9+
+- OpenAI API key
 
-1. Use different models without changing your code
-2. Switch between providers (OpenAI, Anthropic, Google, etc.)
-3. Configure models at runtime
+## Setup
 
-### How to Configure Models
-
-Models can be configured in three ways (in order of precedence):
-
-1. **Request-level**: Specify the model in the API request
-   ```json
-   {
-     "prompt": "Your prompt here",
-     "system_prompt": "Optional system prompt",
-     "model": "claude-3-opus"
-   }
+1. Clone the repository
+2. Create a virtual environment and activate it:
    ```
-
-2. **Environment Variable**: Set the `DEFAULT_MODEL` environment variable
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
-   DEFAULT_MODEL=gpt-4o-mini
+3. Install dependencies:
    ```
+   pip install -r requirements.txt
+   ```
+4. Copy the example environment file and fill in your OpenAI API key:
+   ```
+   cp .env.example .env
+   ```
+   Then edit the `.env` file with your OpenAI API key.
 
-3. **Default Configuration**: Falls back to "gemini-2.0-flash" if not specified
+## Running the App
 
-### Supported Models
-
-The following models are pre-configured in the application:
-
-- **OpenAI**: gpt-4o, gpt-4o-mini, gpt-3.5-turbo
-- **Anthropic**: claude-3-opus, claude-3-sonnet, claude-3-haiku
-- **Google**: gemini-pro, gemini-1.5-pro
-- **Mistral**: mistral-large, mistral-medium, mixtral-8x7b
-- **Meta**: llama-3-70b, llama-3-8b
-
-You can add more models by updating the `LITELLM_PROVIDER_MAP` in `app/utils/config.py`.
-
-## API Usage
-
-### List Available Tools
+Start the Flask server:
 
 ```
-GET /tools
+python ai_chat_app.py
 ```
 
-### Run a Tool
+Then open your browser to `http://localhost:5000`.
 
-```
-POST /{tool_name}
+## Using the Interface
 
-{
-  "prompt": "Your prompt here",
-  "system_prompt": "Optional system prompt",
-  "model": "Optional model name"
-}
-```
+1. **Send a message**: Type in the input box and press Enter or click the send button.
+2. **Toggle tools**: Click the "Tools" button to enable/disable tool selection.
+3. **Change model**: Select a different model from the dropdown.
+4. **Clear chat**: Click the "Clear" button to reset the conversation.
 
-### Tool Selector
+## Features Implemented
 
-```
-POST /tool_selector
+- [x] Chat history with clear user/assistant separation
+- [x] Colorful, styled text with Markdown support
+- [x] Scrollable conversation history
+- [x] Loading/typing indicators
+- [x] Input box at bottom of screen
+- [x] Status bar (model, tokens used, status)
+- [x] Tool usage indicators
 
-{
-  "prompt": "Your prompt here",
-  "system_prompt": "Optional system prompt",
-  "model": "Optional model name",
-  "allowed_tools": ["tool1", "tool2"]
-}
-```
+## License
 
-## Environment Variables
-
-Required environment variables:
-
-- `OPENAI_API_KEY`: Your OpenAI API key (if using OpenAI models)
-- `GEMINI_API_KEY`: Your Google API key (for Gemini models)
-- Other provider keys as needed (ANTHROPIC_API_KEY, etc.)
-
-Optional environment variables:
-
-- `DEFAULT_MODEL`: Default model to use
-
-## Development
-
-### Installation
-
-This project uses Poetry for dependency management. To install dependencies:
-
-```bash
-# Install Poetry if you don't have it
-curl -sSL https://install.python-poetry.org | python3 -
-
-# Install dependencies
-poetry install
-
-# Alternatively, if you don't have Poetry
-pip install -r requirements.txt
-```
-
-### Running the API
-
-```bash
-# With Poetry
-poetry run uvicorn app.main:app --reload
-
-# Without Poetry
-uvicorn app.main:app --reload
-```
-
-### Adding a New Tool
-
-1. Create a new directory in `app/tools/`
-2. Implement the tool with a `run()` function that accepts `prompt`, `system_prompt`, and `model` parameters
-3. Update `app/tools/helpers.py` to register your new tool 
+MIT 
