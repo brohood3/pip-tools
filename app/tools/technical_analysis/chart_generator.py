@@ -1,8 +1,23 @@
-import mplfinance as mpf
-import pandas as pd
-from io import BytesIO
+import os
+import io
+import re
 import base64
-from typing import Dict, Any, List, Optional
+import numpy as np
+import pandas as pd
+from typing import Dict, Any, List, Tuple, Optional, Union
+import traceback
+from io import BytesIO
+from datetime import datetime, timedelta
+
+# Set matplotlib to use non-interactive 'Agg' backend
+# This must be done before any other matplotlib imports
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
+
+import mplfinance as mpf
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+from matplotlib.colors import LinearSegmentedColormap
 from .price_levels import PriceLevels
 
 class ChartGenerator:

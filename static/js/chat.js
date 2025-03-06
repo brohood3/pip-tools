@@ -9,6 +9,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const toggleToolsBtn = document.getElementById('toggleTools');
     const modelSelect = document.getElementById('modelSelect');
     const clearChatBtn = document.getElementById('clearChat');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const darkModeToggle = document.getElementById('darkModeToggle');
+
+    // Initialize dark mode from localStorage
+    const isDarkMode = localStorage.getItem('darkMode') === 'true';
+    if (isDarkMode) {
+        document.body.classList.add('dark-mode');
+        darkModeToggle.innerHTML = '<i class="fa-solid fa-sun"></i><span>Light</span>';
+    }
 
     // Socket.io connection
     const socket = io();
@@ -16,7 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // State
     let useTools = true;
     let conversation = [];
-    let isProcessing = false;
+    let isThinking = false;
 
     // Initialize highlight.js
     hljs.highlightAll();
@@ -44,6 +53,8 @@ document.addEventListener('DOMContentLoaded', () => {
     toggleToolsBtn.addEventListener('click', toggleTools);
     modelSelect.addEventListener('change', changeModel);
     clearChatBtn.addEventListener('click', clearChat);
+    logoutBtn.addEventListener('click', logout);
+    darkModeToggle.addEventListener('click', toggleDarkMode);
 
     // Auto-resize textarea as user types
     userInput.addEventListener('input', () => {
@@ -75,9 +86,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Functions
     function sendMessage() {
         const message = userInput.value.trim();
-        if (message && !isProcessing) {
-            // Disable input while processing
-            isProcessing = true;
+        if (message && !isThinking) {
+            // Disable input while thinking
+            isThinking = true;
             userInput.disabled = true;
             sendButton.disabled = true;
 
@@ -90,7 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Show typing indicator
             showTypingIndicator();
-            setStatus('Processing...');
+            setStatus('Thinking...');
 
             // Send to server
             fetch('/api/chat', {
@@ -117,7 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 // Re-enable input
-                isProcessing = false;
+                isThinking = false;
                 userInput.disabled = false;
                 sendButton.disabled = false;
                 userInput.focus();
@@ -129,7 +140,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error('Error:', error);
                 hideTypingIndicator();
                 setStatus('Error: ' + error.message);
-                isProcessing = false;
+                isThinking = false;
                 userInput.disabled = false;
                 sendButton.disabled = false;
             });
@@ -146,6 +157,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${role}`;
 
+        // Add avatar based on role
+        const avatar = document.createElement('div');
+        avatar.className = 'avatar';
+        
+        if (role === 'user') {
+            avatar.innerHTML = '<i class="fa-solid fa-user"></i>';
+        } else {
+            avatar.innerHTML = '<i class="fa-solid fa-robot"></i>';
+        }
+        
+        messageDiv.appendChild(avatar);
+
         const messageContent = document.createElement('div');
         messageContent.className = 'message-content';
         
@@ -153,6 +176,17 @@ document.addEventListener('DOMContentLoaded', () => {
         messageContent.innerHTML = marked.parse(content);
         
         messageDiv.appendChild(messageContent);
+
+        // Add chart image if available
+        if (metadata.chart) {
+            const chartImg = document.createElement('img');
+            chartImg.src = `data:image/png;base64,${metadata.chart}`;
+            chartImg.alt = 'Technical Analysis Chart';
+            chartImg.style.maxWidth = '100%';
+            chartImg.style.borderRadius = '8px';
+            chartImg.style.marginTop = '10px';
+            messageContent.appendChild(chartImg);
+        }
 
         // Add metadata if available
         if (role === 'assistant' && Object.keys(metadata).length > 0) {
@@ -272,6 +306,45 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function formatTime(date) {
         return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function logout() {
+        // Show confirmation dialog
+        if (confirm('Are you sure you want to logout?')) {
+            fetch('/auth/logout', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => {
+                if (response.ok) {
+                    // Redirect to login page
+                    window.location.href = '/login';
+                } else {
+                    console.error('Logout failed');
+                    alert('Failed to logout. Please try again.');
+                }
+            })
+            .catch(error => {
+                console.error('Logout error:', error);
+                alert('An error occurred during logout.');
+            });
+        }
+    }
+
+    function toggleDarkMode() {
+        const isDarkMode = document.body.classList.toggle('dark-mode');
+        
+        // Update button icon and text
+        if (isDarkMode) {
+            darkModeToggle.innerHTML = '<i class="fa-solid fa-sun"></i><span>Light</span>';
+        } else {
+            darkModeToggle.innerHTML = '<i class="fa-solid fa-moon"></i><span>Dark</span>';
+        }
+        
+        // Save preference to localStorage
+        localStorage.setItem('darkMode', isDarkMode);
     }
 
     // Initialize

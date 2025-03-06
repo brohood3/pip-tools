@@ -787,15 +787,20 @@ class TechnicalAnalysis:
             # Generate chart if we have valid indicators
             chart_base64 = ""
             if self._current_df is not None and indicators:
-                chart_base64 = self.chart_generator.generate_chart(
-                    self._current_df,
-                    indicators,
-                    symbol,
-                    analysis_params["timeframe"],
-                    analysis_type=analysis_params["strategy_type"]
-                )
-                # Store the chart for later retrieval
-                self._store_chart(chart_base64)
+                try:
+                    chart_base64 = self.chart_generator.generate_chart(
+                        self._current_df,
+                        indicators,
+                        symbol,
+                        analysis_params["timeframe"],
+                        analysis_type=analysis_params["strategy_type"]
+                    )
+                    # Store the chart for later retrieval
+                    if chart_base64:
+                        self._store_chart(chart_base64)
+                except Exception as e:
+                    print(f"Error generating chart: {str(e)}")
+                    # Continue without the chart - we still have the analysis text
 
             # Store all context in metadata
             metadata = {

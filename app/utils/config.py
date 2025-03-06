@@ -14,13 +14,13 @@ if os.environ.get("DEFAULT_MODEL"):
 
 # API Keys
 OPENAI_API_KEY = ensure_var("OPENAI_API_KEY") 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY_2")
 
 # Configure LiteLLM with API keys
 if GEMINI_API_KEY:
     # Set all possible environment variables that LiteLLM might check for Google auth
     os.environ["GOOGLE_API_KEY"] = GEMINI_API_KEY
-    os.environ["GEMINI_API_KEY"] = GEMINI_API_KEY
+    os.environ["GEMINI_API_KEY_2"] = GEMINI_API_KEY
     os.environ["VERTEX_AI_API_KEY"] = GEMINI_API_KEY
 
 # LiteLLM configuration

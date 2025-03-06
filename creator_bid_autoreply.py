@@ -147,13 +147,43 @@ def process_tweet(tweet: Dict[str, Any]) -> None:
         logger.error(f"Tool {tool_to_use} not found")
         return
 
-    tool = TOOL_TO_MODULE[tool_to_use]
-    result = tool.run(tweet['text'])
-    reply_text = get_reply(openai_client, tweet['text'], result)
-
-    logger.info(f"Replying to tweet {tweet['id']} with: {reply_text}")
-    reply_to_tweet(tweet['id'], reply_text)
-    day_to_author_count[day][author] = author_count + 1
+    reply_text = None
+    try:
+        tool = TOOL_TO_MODULE[tool_to_use]
+        logger.info(f"Running tool: {tool_to_use} on input: {tweet['text']}")
+        result = tool.run(tweet['text'])
+        
+        # Extract only the response field if it exists, otherwise use a summary
+        tool_output = ""
+        if isinstance(result, dict) and "response" in result:
+            tool_output = result["response"]
+        elif isinstance(result, str):
+            tool_output = result
+        elif isinstance(result, dict):
+            # Convert dict to a simple string representation
+            tool_output = str({k: v for k, v in result.items() if k != "raw_data"})
+        else:
+            # For any other type, convert to string
+            tool_output = str(result)
+            
+        logger.info(f"Extracted tool output (first 100 chars): {tool_output[:100]}...")
+        
+        # Generate response using the tool's output as part of the prompt
+        full_prompt = f"{tweet['text']}\n\nAnalysis results:\n{tool_output}"
+        reply_text = get_reply(openai_client, full_prompt)
+        
+    except Exception as e:
+        logger.exception(f"Error processing tweet {tweet['id']}: {e}")
+        return  # Don't tweet anything if there was an error
+        
+    # Only tweet if we successfully generated a reply
+    if reply_text:
+        try:
+            logger.info(f"Replying to tweet {tweet['id']} with: {reply_text}")
+            reply_to_tweet(tweet['id'], reply_text)
+            day_to_author_count[day][author] = author_count + 1
+        except Exception as e:
+            logger.exception(f"Error sending reply to tweet {tweet['id']}: {e}")
 
 
 def main():

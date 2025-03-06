@@ -62,7 +62,7 @@ def generate_completion(
         # Special handling for Gemini models
         if model_name.startswith("gemini-"):
             # For Gemini models, explicitly pass the API key
-            gemini_api_key = os.getenv("GEMINI_API_KEY")
+            gemini_api_key = os.getenv("GEMINI_API_KEY_2")
             if gemini_api_key:
                 params["api_key"] = gemini_api_key
             

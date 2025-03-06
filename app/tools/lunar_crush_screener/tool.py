@@ -417,9 +417,14 @@ class LunarCrushScreener:
             information = json.dumps(coins_data, indent=2)
             
             # Create prompt using the user's initial prompt
-            prompt = f"""Given the following prompt: "{original_prompt if original_prompt else 'Find promising crypto opportunities'}" create a reply to that prompt using the following information: "{information}" """
+            prompt = f"""The user asked: "{original_prompt if original_prompt else 'Find promising crypto opportunities'}"
 
-            default_system_prompt = "You are a cryptocurrency analyst specializing in social metrics and momentum analysis. Provide detailed, actionable insights on emerging opportunities based on LunarCrush data."
+I've fetched and analyzed the following cryptocurrency data for them:
+{information}
+
+Create a helpful response that analyzes this data to answer their query."""
+
+            default_system_prompt = "You are a cryptocurrency analyst focused on token-specific analysis. When responding, always begin by mentioning that this data was automatically gathered by the LunarCrush Screener tool. Analyze the provided token data including social metrics, price action, and market dynamics. Focus your insights specifically on the individual tokens' metrics and what they indicate about each token's current momentum and potential. Avoid general market commentary and focus on data-driven insights about these specific tokens. Ignore null values, but be specific about the numbers."
             
             return generate_completion(
                 prompt=prompt,
