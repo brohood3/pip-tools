@@ -10,26 +10,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.1/socket.io.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
-    <style>
-        .wallet-display {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.5rem 1rem;
-            background-color: var(--bg-color);
-            border-radius: var(--border-radius);
-            font-size: 0.875rem;
-            margin-right: 1rem;
-        }
-        
-        .wallet-address {
-            font-family: monospace;
-            max-width: 100px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-    </style>
 </head>
 <body>
     <div class="app-container">
@@ -39,14 +19,6 @@
                 <h1>Eolas</h1>
             </div>
             <div class="header-controls">
-                <div class="wallet-display" id="walletDisplay">
-                    <i class="fa-solid fa-wallet"></i>
-                    <span class="wallet-address" id="userWalletDisplay">{{ session.auth.address if session.auth else 'Not connected' }}</span>
-                </div>
-                <button id="darkModeToggle" class="header-btn">
-                    <i class="fa-solid fa-moon"></i>
-                    <span>Dark</span>
-                </button>
                 <button id="toggleTools" class="header-btn">
                     <i class="fa-solid fa-wrench"></i>
                     <span>Tools: On</span>
@@ -63,19 +35,12 @@
                     <i class="fa-solid fa-trash"></i>
                     <span>Clear</span>
                 </button>
-                <button id="logoutBtn" class="header-btn">
-                    <i class="fa-solid fa-sign-out-alt"></i>
-                    <span>Logout</span>
-                </button>
             </div>
         </header>
 
         <main class="chat-container">
             <div id="messageContainer" class="message-container">
                 <div class="message system">
-                    <div class="avatar system-avatar">
-                        <i class="fa-solid fa-robot"></i>
-                    </div>
                     <div class="message-content">
                         <p>Hello, I'm Eolas. How can I assist you today?</p>
                     </div>

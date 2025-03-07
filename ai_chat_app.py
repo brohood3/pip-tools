@@ -4,14 +4,9 @@ import json
 from typing import Dict, Any, Optional
 from datetime import datetime
 
-from flask import Flask, request, jsonify, render_template, send_from_directory, redirect, url_for, session
+from flask import Flask, request, jsonify, render_template, send_from_directory
 from openai import OpenAI
 from flask_socketio import SocketIO, emit
-from flask_session import Session
-
-# Import our authentication module
-from auth import auth_bp
-from auth_middleware import auth_required
 
 # Set up logging
 logging.basicConfig(
@@ -23,19 +18,7 @@ logger = logging.getLogger(__name__)
 # Initialize the Flask app
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev_key")
-
-# Configure server-side session
-app.config["SESSION_TYPE"] = "filesystem"
-app.config["SESSION_PERMANENT"] = False
-app.config["SESSION_USE_SIGNER"] = True
-app.config["SESSION_FILE_DIR"] = "./.flask_session/"
-Session(app)
-
-# Initialize SocketIO
 socketio = SocketIO(app)
-
-# Register the authentication blueprint
-app.register_blueprint(auth_bp)
 
 # Try to import tools, but provide fallback if not available
 TOOL_IMPORTS_AVAILABLE = False
@@ -174,11 +157,6 @@ def process_with_tools(user_input: str) -> Dict[str, Any]:
         socketio.emit('status_update', {'status': f'Running tool: {tool_to_use}...'})
         result = tool.run(user_input)
         
-        # Extract chart data if available
-        chart_data = None
-        if isinstance(result, dict) and "chart" in result:
-            chart_data = result.get("chart")
-        
         # Extract only the response field if it exists
         tool_output = ""
         if isinstance(result, dict) and "response" in result:
@@ -186,21 +164,16 @@ def process_with_tools(user_input: str) -> Dict[str, Any]:
         elif isinstance(result, str):
             tool_output = result
         elif isinstance(result, dict):
-            tool_output = str({k: v for k, v in result.items() if k not in ["raw_data", "chart"]})
+            tool_output = str({k: v for k, v in result.items() if k != "raw_data"})
         else:
             tool_output = str(result)
         
         # Generate response with tool output
-        full_prompt = f"Reply to the user's prompt: {user_input}\n\nusing this information:\n{tool_output}"
+        full_prompt = f"{user_input}\n\nAnalysis results:\n{tool_output}"
         response = get_reply(full_prompt)
         
         # Add tool metadata
         response["tool_used"] = tool_to_use
-        
-        # Include chart data if available
-        if chart_data:
-            response["chart"] = chart_data
-            
         return response
     except Exception as e:
         logger.exception(f"Error in tool processing: {e}")
@@ -209,18 +182,11 @@ def process_with_tools(user_input: str) -> Dict[str, Any]:
 
 # Routes
 @app.route('/')
-@auth_required
 def index():
     """Serve the main chat interface."""
     return render_template('index.html')
 
-@app.route('/login')
-def login():
-    """Serve the login page."""
-    return render_template('login.html')
-
 @app.route('/api/chat', methods=['POST'])
-@auth_required
 def chat():
     """API endpoint for chat messages."""
     data = request.json
@@ -243,14 +209,12 @@ def chat():
     return jsonify(response)
 
 @app.route('/api/models', methods=['GET'])
-@auth_required
 def list_models():
     """List available models."""
     models = ["gpt-4o", "gpt-3.5-turbo", "gpt-4o-mini"]
     return jsonify({"models": models, "current": CURRENT_MODEL})
 
 @app.route('/api/models', methods=['POST'])
-@auth_required
 def set_model():
     """Set the current model."""
     global CURRENT_MODEL
@@ -264,13 +228,11 @@ def set_model():
     return jsonify({"success": True, "current": CURRENT_MODEL})
 
 @app.route('/api/usage', methods=['GET'])
-@auth_required
 def get_usage():
     """Get the current token usage statistics."""
     return jsonify(token_usage)
 
 @app.route('/api/reset', methods=['POST'])
-@auth_required
 def reset_usage():
     """Reset the token usage statistics."""
     global token_usage
