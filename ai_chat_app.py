@@ -8,6 +8,7 @@ from flask import Flask, request, jsonify, render_template, send_from_directory,
 from openai import OpenAI
 from flask_socketio import SocketIO, emit
 from flask_session import Session
+from flask_cors import CORS
 
 # Import our authentication module
 from auth import auth_bp
@@ -24,6 +25,9 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev_key")
 
+# Enable CORS
+CORS(app, resources={r"/api/*": {"origins": "*"}})
+
 # Configure server-side session
 app.config["SESSION_TYPE"] = "filesystem"
 app.config["SESSION_PERMANENT"] = False
@@ -32,7 +36,7 @@ app.config["SESSION_FILE_DIR"] = "./.flask_session/"
 Session(app)
 
 # Initialize SocketIO
-socketio = SocketIO(app)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Register the authentication blueprint
 app.register_blueprint(auth_bp)
@@ -184,14 +188,20 @@ def process_with_tools(user_input: str) -> Dict[str, Any]:
         if isinstance(result, dict) and "response" in result:
             tool_output = result["response"]
         elif isinstance(result, str):
-            tool_output = result
+            # Limit the size of string output
+            tool_output = result[:4000] + "..." if len(result) > 4000 else result
         elif isinstance(result, dict):
-            tool_output = str({k: v for k, v in result.items() if k not in ["raw_data", "chart"]})
+            # Limit the size of dictionary output
+            filtered_dict = {k: v for k, v in result.items() if k not in ["raw_data", "chart"]}
+            dict_str = str(filtered_dict)
+            tool_output = dict_str[:4000] + "..." if len(dict_str) > 4000 else dict_str
         else:
-            tool_output = str(result)
+            # Limit the size of other outputs
+            result_str = str(result)
+            tool_output = result_str[:4000] + "..." if len(result_str) > 4000 else result_str
         
-        # Generate response with tool output
-        full_prompt = f"Reply to the user's prompt: {user_input}\n\nusing this information:\n{tool_output}"
+        # Generate response with tool output - keep it concise
+        full_prompt = f"Reply to the user's prompt: {user_input}\n\nHere's a summary of the tool results:\n{tool_output}"
         response = get_reply(full_prompt)
         
         # Add tool metadata
@@ -281,6 +291,128 @@ def reset_usage():
     }
     return jsonify({"success": True})
 
+@app.route('/api/process_chat', methods=['POST'])
+def api_process_chat():
+    """
+    API endpoint for external applications to access tool processing functionality
+    """
+    try:
+        data = request.json
+        if not data or 'message' not in data:
+            return jsonify({'error': 'No message provided'}), 400
+        
+        user_input = data.get('message')
+        model = data.get('model', 'gpt-4o')
+        use_tools = data.get('use_tools', True)
+        message_history = data.get('message_history', [])
+        wallet_address = data.get('wallet_address')
+        
+        # If tools are disabled, just return a standard response
+        if not use_tools or not TOOL_IMPORTS_AVAILABLE:
+            response = get_reply(user_input)
+            return jsonify({
+                'text': response['text'],
+                'model': model,
+                'timestamp': datetime.now().isoformat(),
+                'tool_used': None,
+                'usage': response.get('usage', {})
+            })
+        
+        # Process with tools
+        try:
+            # Run tool selector
+            res = tool_selector(user_input, allowed_tools=ALLOWED_TOOLS)
+            tool_response = res.get("response", {})
+            tool_to_use = tool_response.get("tool", "none")
+            confidence = tool_response.get("confidence", "low")
+            
+            logger.info(f"Tool selection: {tool_to_use}, Confidence: {confidence}")
+            
+            # If no suitable tool or low confidence, return a default response
+            if tool_to_use == "none" or confidence != "high":
+                logger.info(f"No suitable tool found or low confidence for: {user_input}")
+                response = get_reply(user_input)
+                return jsonify({
+                    'text': response['text'],
+                    'model': model,
+                    'timestamp': datetime.now().isoformat(),
+                    'tool_used': None,
+                    'usage': response.get('usage', {})
+                })
+            
+            # Ensure the tool exists
+            if tool_to_use not in TOOL_TO_MODULE:
+                logger.error(f"Tool {tool_to_use} not found")
+                response = get_reply(user_input)
+                return jsonify({
+                    'text': response['text'],
+                    'model': model,
+                    'timestamp': datetime.now().isoformat(),
+                    'tool_used': None,
+                    'usage': response.get('usage', {})
+                })
+            
+            # Run the selected tool
+            tool = TOOL_TO_MODULE[tool_to_use]
+            result = tool.run(user_input)
+            
+            # Get tool output
+            tool_output = ""
+            if isinstance(result, dict) and "response" in result:
+                # Extract the response field which is what the tools actually output
+                tool_output = result.get("response", "")
+            elif isinstance(result, dict) and "answer" in result:
+                tool_output = result.get("answer", "")
+            elif isinstance(result, dict) and "data" in result:
+                # Limit the size of data to prevent token limit issues
+                data_str = str(result.get("data", ""))
+                tool_output = data_str[:4000] + "..." if len(data_str) > 4000 else data_str
+            elif isinstance(result, str):
+                # Limit the size of string output
+                tool_output = result[:4000] + "..." if len(result) > 4000 else result
+            else:
+                # Limit the size of other outputs
+                result_str = str(result)
+                tool_output = result_str[:4000] + "..." if len(result_str) > 4000 else result_str
+            
+            # Create tool context - keep it concise
+            tool_context = f"I used the {tool_to_use} tool to analyze your request. Here's a summary of the results: {tool_output}"
+            
+            # Get LLM response with tool context
+            system_prompt = f"You are Eolas, an AI assistant with access to specialized tools. {tool_context}"
+            
+            # We don't need to keep message_history or append to it, as get_reply doesn't use it
+            
+            # Get response with the tool context included
+            response = get_reply(user_input, system_prompt=system_prompt)
+            
+            # Return formatted response
+            return jsonify({
+                'text': response['text'],
+                'model': model,
+                'timestamp': datetime.now().isoformat(),
+                'tool_used': tool_to_use,
+                'reasoning': tool_response.get('reasoning', ''),
+                'confidence': confidence,
+                'usage': response.get('usage', {})
+            })
+            
+        except Exception as tool_err:
+            logger.error(f"Error in tool processing: {tool_err}")
+            response = get_reply(user_input)
+            return jsonify({
+                'text': response['text'],
+                'model': model,
+                'timestamp': datetime.now().isoformat(),
+                'tool_used': None,
+                'error': str(tool_err),
+                'usage': response.get('usage', {})
+            })
+    
+    except Exception as e:
+        logger.error(f"API error: {e}")
+        return jsonify({'error': str(e)}), 500
+
 # WebSocket events
 @socketio.on('connect')
 def handle_connect():
@@ -312,6 +444,6 @@ if __name__ == '__main__':
         print("Please check your API key and internet connection.")
         exit(1)
     
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 5001))
     debug = os.environ.get("DEBUG", "False").lower() == "true"
     socketio.run(app, host='0.0.0.0', port=port, debug=debug) 
