@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eolas - Web3 Login</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .login-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 80vh;
+            padding: 2rem;
+            text-align: center;
+        }
+        
+        .login-box {
+            background-color: var(--light-bg);
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            box-shadow: 0 4px 10px var(--shadow-color);
+            width: 100%;
+            max-width: 500px;
+        }
+        
+        .login-title {
+            color: var(--primary-color);
+            margin-bottom: 1.5rem;
+        }
+        
+        .login-button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin: 1rem auto;
+            transition: background-color 0.2s;
+        }
+        
+        .login-button:hover {
+            background-color: var(--secondary-color);
+        }
+        
+        .login-button:disabled {
+            background-color: var(--gray-text);
+            cursor: not-allowed;
+        }
+        
+        .wallet-info {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background-color: var(--bg-color);
+            border-radius: var(--border-radius);
+            display: none;
+        }
+        
+        .wallet-address {
+            font-family: monospace;
+            word-break: break-all;
+            padding: 0.5rem;
+            background-color: var(--dark-bg);
+            color: var(--light-text);
+            border-radius: 4px;
+            margin: 0.5rem 0;
+        }
+        
+        .error-message {
+            color: var(--error-color);
+            margin-top: 1rem;
+            padding: 0.5rem;
+            border-radius: 4px;
+            background-color: rgba(229, 62, 62, 0.1);
+            display: none;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="logo">
+                <i class="fa-solid fa-robot"></i>
+                <h1>Eolas</h1>
+            </div>
+        </header>
+
+        <main class="login-container">
+            <div class="login-box">
+                <h2 class="login-title">Web3 Authentication</h2>
+                <p>Connect your crypto wallet to access the Eolas AI Chat</p>
+                
+                <button id="connectWalletBtn" class="login-button">
+                    <i class="fa-solid fa-wallet"></i>
+                    Connect Wallet
+                </button>
+                
+                <button id="signInBtn" class="login-button" style="display: none;">
+                    <i class="fa-solid fa-signature"></i>
+                    Sign Message to Login
+                </button>
+                
+                <div id="walletInfo" class="wallet-info">
+                    <p>Connected Wallet:</p>
+                    <div id="walletAddress" class="wallet-address"></div>
+                </div>
+                
+                <div id="errorMessage" class="error-message"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Update ethers.js CDN to a more reliable source -->
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+    <script src="{{ url_for('static', filename='js/web3auth/auth.js') }}"></script>
+</body>
+</html> 
