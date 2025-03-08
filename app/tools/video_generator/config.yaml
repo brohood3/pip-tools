@@ -1,0 +1,30 @@
+name: video_generator
+description: Generates videos based on text prompts using the Replicate API with the wan-video/wan-2.1-1.3b model.
+version: "1.0"
+use_cases:
+  - Creating short videos from text descriptions
+  - Generating visual content for presentations
+  - Producing creative video concepts
+  - Visualizing scenes or scenarios
+  - Creating animated content from text prompts
+example_prompts:
+  - "A dog riding on a skateboard down a hill"
+  - "A spaceship landing on a distant planet"
+  - "A timelapse of a flower blooming"
+  - "A car driving through a futuristic city"
+  - "A person walking on a beach at sunset"
+required_params:
+  prompt: string
+optional_params:
+  model: string
+  return_base64: boolean
+api_keys:
+  replicate: string
+output_format:
+  video: string  # Either a file path or base64 encoded string
+  format: string  # "file_path" or "base64"
+  metadata:
+    timestamp: string
+    prompt: string
+    model: string
+    requested_model: string  # The model requested by the user (if any) 
