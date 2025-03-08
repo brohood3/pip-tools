@@ -31,7 +31,8 @@ try:
         "general_predictor",
         "lunar_crush_screener",
         "query_extract",
-        "macro_outlook_analyzer"
+        "macro_outlook_analyzer",
+        "brian_transaction"
     ]
     logger.info("Tool modules successfully imported")
 except ImportError as e:

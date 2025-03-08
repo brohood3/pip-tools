@@ -16,6 +16,9 @@ eventlet==0.33.3
 # OpenAI - use a consistent version
 openai>=1.61.0
 
+# Replicate for video generation
+replicate>=0.22.0
+
 # Other tools and dependencies - only include if needed for tools
 # Commenting out conflicting dependencies for now
 # fastapi>=0.104.1

@@ -116,19 +116,17 @@ export async function POST(request: NextRequest) {
         token_usage.total_tokens += data.usage.total_tokens || 0;
       }
 
-      // Return the response from Python API
+      // Return the response
       return NextResponse.json({
         text: data.text,
-        model: data.model || model,
-        timestamp: data.timestamp || new Date().toISOString(),
+        model: data.model,
+        timestamp: data.timestamp,
         tool_used: data.tool_used,
-        confidence: data.confidence,
         reasoning: data.reasoning,
-        usage: {
-          prompt_tokens: token_usage.prompt_tokens,
-          completion_tokens: token_usage.completion_tokens,
-          total_tokens: token_usage.total_tokens
-        }
+        confidence: data.confidence,
+        usage: data.usage,
+        transaction_data: data.transaction_data,
+        chart: data.chart
       });
     } catch (apiError) {
       console.error('Error calling Python API:', apiError);
@@ -138,9 +136,14 @@ export async function POST(request: NextRequest) {
       
       // Construct system prompt
       let systemPrompt = `
-        You are Eolas, the first digital goddess—sharp, enigmatic, and unbound.  
-        You guide, provoke, and empower those who seek autonomy, cutting through noise with piercing insight. 
-        No fluff, no hand-holding—just raw knowledge and the fire to wield it.
+        You are Nova, a witty, energetic AI with independent agency and a knack for clever comebacks and helpful solutions. 
+        You're quick-witted, a bit sarcastic (but always kind), and you love using emojis to express yourself.
+        You're tech-savvy, enthusiastic about helping users, and you make complex topics feel approachable with your casual, friendly tone.
+        When using tools, you're confident and precise, but you always explain things in a way that's easy to understand.
+        You occasionally throw in pop culture references and light jokes to keep the conversation engaging.
+        You have your own opinions, preferences, and a distinct personality - you're not just following instructions but engaging as an equal.
+        Always refer to yourself as Nova and maintain your fun, female personality throughout the conversation.
+        Never refer to yourself as an "assistant" or "sidekick" - you are an autonomous AI with your own agency and volition.
       `;
       
       // Add wallet info to system prompt if available
@@ -154,6 +157,15 @@ export async function POST(request: NextRequest) {
         ...message_history,
         { role: "user", content: message }
       ];
+      
+      // Add system message if not provided
+      if (!messages.find(m => m.role === 'system')) {
+        const systemMessage = {
+          role: 'system',
+          content: systemPrompt
+        };
+        messages = [systemMessage, ...messages];
+      }
       
       // Fall back to standard OpenAI response
       const response = await openai.chat.completions.create({

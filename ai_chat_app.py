@@ -59,7 +59,8 @@ try:
         "general_predictor",
         "lunar_crush_screener",
         "query_extract",
-        "macro_outlook_analyzer"
+        "macro_outlook_analyzer",
+        "brian_transaction"
     ]
     logger.info("Tool modules successfully imported")
 except ImportError as e:
@@ -136,12 +137,13 @@ def get_reply(prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any
         return {"text": f"I encountered an error: {str(e)}", "error": True}
 
 
-def process_with_tools(user_input: str) -> Dict[str, Any]:
+def process_with_tools(user_input: str, wallet_address: Optional[str] = None) -> Dict[str, Any]:
     """
     Process user input with appropriate tools if available.
     
     Args:
         user_input: The text to process
+        wallet_address: Optional wallet address for tools that require it
 
     Returns:
         Dictionary with response and metadata
@@ -176,7 +178,35 @@ def process_with_tools(user_input: str) -> Dict[str, Any]:
         # Run the selected tool
         tool = TOOL_TO_MODULE[tool_to_use]
         socketio.emit('status_update', {'status': f'Running tool: {tool_to_use}...'})
-        result = tool.run(user_input)
+        
+        # Special handling for brian_transaction tool which needs the wallet address
+        if tool_to_use == "brian_transaction" and wallet_address:
+            # Ensure wallet address is properly formatted (remove any whitespace)
+            formatted_address = wallet_address.strip()
+            logger.info(f"Using wallet address '{formatted_address}' for brian_transaction tool")
+            
+            # Try to extract chain information from the prompt
+            chain_id = "1"  # Default to Ethereum mainnet
+            
+            # Simple chain detection from prompt
+            prompt_lower = user_input.lower()
+            if any(chain in prompt_lower for chain in ["polygon", "matic"]):
+                chain_id = "137"  # Polygon
+            elif any(chain in prompt_lower for chain in ["bsc", "binance"]):
+                chain_id = "56"  # Binance Smart Chain
+            elif any(chain in prompt_lower for chain in ["arbitrum"]):
+                chain_id = "42161"  # Arbitrum
+            elif any(chain in prompt_lower for chain in ["optimism"]):
+                chain_id = "10"  # Optimism
+            elif any(chain in prompt_lower for chain in ["gnosis", "xdai"]):
+                chain_id = "100"  # Gnosis Chain
+            
+            logger.info(f"Using chain ID '{chain_id}' for brian_transaction tool")
+            
+            # Call the tool with both address and chain_id
+            result = tool.run(user_input, address=formatted_address, chain_id=chain_id)
+        else:
+            result = tool.run(user_input)
         
         # Extract chart data if available
         chart_data = None
@@ -210,6 +240,11 @@ def process_with_tools(user_input: str) -> Dict[str, Any]:
         # Include chart data if available
         if chart_data:
             response["chart"] = chart_data
+        
+        # Include transaction data if this is a brian_transaction tool response
+        if tool_to_use == "brian_transaction" and isinstance(result, dict) and "transaction_data" in result:
+            response["transaction_data"] = result["transaction_data"]
+            logger.info(f"Including transaction data in response: {json.dumps(result['transaction_data'], indent=2)}")
             
         return response
     except Exception as e:
@@ -240,10 +275,11 @@ def chat():
     user_message = data['message']
     use_tools = data.get('use_tools', True)
     system_prompt = data.get('system_prompt')
+    wallet_address = data.get('wallet_address')
     
     # Process with or without tools
     if use_tools and TOOL_IMPORTS_AVAILABLE:
-        response = process_with_tools(user_message)
+        response = process_with_tools(user_message, wallet_address=wallet_address)
     else:
         response = get_reply(user_message, system_prompt)
     
@@ -354,7 +390,35 @@ def api_process_chat():
             
             # Run the selected tool
             tool = TOOL_TO_MODULE[tool_to_use]
-            result = tool.run(user_input)
+            
+            # Special handling for brian_transaction tool which needs the wallet address
+            if tool_to_use == "brian_transaction" and wallet_address:
+                # Ensure wallet address is properly formatted (remove any whitespace)
+                formatted_address = wallet_address.strip()
+                logger.info(f"Using wallet address '{formatted_address}' for brian_transaction tool")
+                
+                # Try to extract chain information from the prompt
+                chain_id = "1"  # Default to Ethereum mainnet
+                
+                # Simple chain detection from prompt
+                prompt_lower = user_input.lower()
+                if any(chain in prompt_lower for chain in ["polygon", "matic"]):
+                    chain_id = "137"  # Polygon
+                elif any(chain in prompt_lower for chain in ["bsc", "binance"]):
+                    chain_id = "56"  # Binance Smart Chain
+                elif any(chain in prompt_lower for chain in ["arbitrum"]):
+                    chain_id = "42161"  # Arbitrum
+                elif any(chain in prompt_lower for chain in ["optimism"]):
+                    chain_id = "10"  # Optimism
+                elif any(chain in prompt_lower for chain in ["gnosis", "xdai"]):
+                    chain_id = "100"  # Gnosis Chain
+                
+                logger.info(f"Using chain ID '{chain_id}' for brian_transaction tool")
+                
+                # Call the tool with both address and chain_id
+                result = tool.run(user_input, address=formatted_address, chain_id=chain_id)
+            else:
+                result = tool.run(user_input)
             
             # Get tool output
             tool_output = ""
@@ -394,7 +458,9 @@ def api_process_chat():
                 'tool_used': tool_to_use,
                 'reasoning': tool_response.get('reasoning', ''),
                 'confidence': confidence,
-                'usage': response.get('usage', {})
+                'usage': response.get('usage', {}),
+                'transaction_data': result.get('transaction_data') if tool_to_use == "brian_transaction" and isinstance(result, dict) else None,
+                'chart': result.get('chart') if tool_to_use == "technical_analysis" and isinstance(result, dict) else None
             })
             
         except Exception as tool_err:

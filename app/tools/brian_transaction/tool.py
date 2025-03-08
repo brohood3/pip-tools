@@ -43,16 +43,42 @@ class BrianTransaction:
             Dict containing the response from Brian API
         """
         if not prompt:
-            return {"error": "Missing required parameter: prompt"}
+            return {"error": "Missing required parameter: prompt", "response": "I need a transaction description to generate data."}
         
         if not address:
             # Try to extract address from prompt, otherwise return an error
-            return {"error": "Missing required parameter: address"}
+            logger.error("Missing required address parameter in BrianTransaction.run")
+            return {"error": "Missing required parameter: address", "response": "I need a connected wallet address to generate transaction data."}
+        
+        # Ensure address is properly formatted (remove any whitespace)
+        address = address.strip()
+        logger.info(f"Using wallet address: '{address}'")
         
         # Set default chain ID to Ethereum mainnet if not specified
         if not chain_id:
             chain_id = "1"  # Ethereum mainnet
             logger.info(f"No chain_id specified, defaulting to Ethereum mainnet (1)")
+        else:
+            # Ensure chain_id is properly formatted
+            chain_id = chain_id.strip()
+            logger.info(f"Using chain_id: '{chain_id}'")
+        
+        # Modify the prompt to include the wallet address and chain ID
+        # This ensures the API can extract these parameters from the prompt text
+        chain_name = "Ethereum"  # Default for chain ID 1
+        if chain_id == "137":
+            chain_name = "Polygon"
+        elif chain_id == "56":
+            chain_name = "BSC"
+        elif chain_id == "42161":
+            chain_name = "Arbitrum"
+        elif chain_id == "10":
+            chain_name = "Optimism"
+        elif chain_id == "100":
+            chain_name = "Gnosis"
+        
+        enhanced_prompt = f"{prompt.strip()} using wallet {address} on {chain_name} chain"
+        logger.info(f"Enhanced prompt: '{enhanced_prompt}'")
         
         # Prepare the request
         headers = {
@@ -61,13 +87,10 @@ class BrianTransaction:
         }
         
         payload = {
-            "prompt": prompt,
-            "address": address
+            "prompt": enhanced_prompt,
+            "address": address,
+            "chainId": chain_id
         }
-        
-        # Add chain_id if provided
-        if chain_id:
-            payload["chainId"] = chain_id
         
         logger.info(f"Calling Brian API with payload: {json.dumps(payload, indent=2)}")
             
@@ -88,23 +111,59 @@ class BrianTransaction:
                 try:
                     error_detail = response.json()
                     logger.error(f"Brian API error response: {json.dumps(error_detail, indent=2)}")
+                    
+                    # Extract more specific error information
+                    if 'error' in error_detail:
+                        error_msg = f"Brian API error: {error_detail['error']}"
+                        
+                        # Check for token support issues
+                        if "tokens in your request are not supported" in error_detail['error']:
+                            # Extract the tokens from extractedParams if available
+                            tokens = []
+                            if 'extractedParams' in error_detail and len(error_detail['extractedParams']) > 0:
+                                params = error_detail['extractedParams'][0]
+                                if 'token1' in params:
+                                    tokens.append(params['token1'])
+                                if 'token2' in params:
+                                    tokens.append(params['token2'])
+                            
+                            tokens_str = ", ".join(tokens) if tokens else "specified tokens"
+                            chain_name = "the selected chain"
+                            if chain_id == "1":
+                                chain_name = "Ethereum mainnet"
+                            elif chain_id == "137":
+                                chain_name = "Polygon"
+                            
+                            error_msg = f"The {tokens_str} are not supported on {chain_name}. Please try different tokens or a different chain."
+                            return {
+                                "error": error_msg,
+                                "response": f"I couldn't complete this transaction. {error_msg} You might want to try a different token pair or blockchain network."
+                            }
+                    
                     if 'message' in error_detail:
                         error_msg = f"Brian API error: {error_detail['message']}"
                 except:
                     logger.error(f"Failed to parse error response: {response.text}")
                 
-                return {"error": error_msg}
+                return {"error": error_msg, "response": f"I encountered an error while trying to generate the transaction: {error_msg}"}
             
             response.raise_for_status()
             
             api_response = response.json()
             logger.info(f"Received successful response from Brian API")
             
+            # Log the complete response for debugging
+            logger.info(f"Complete Brian API response: {json.dumps(api_response, indent=2)}")
+            
             # Format the response
             result = {
                 "text": self._format_transaction_description(api_response),
-                "metadata": api_response
+                "metadata": api_response,
+                "transaction_data": api_response  # Include the complete API response as transaction_data
             }
+            
+            # Ensure the result has a 'response' field for consistency with other tools
+            result["response"] = result["text"]
             
             return result
             
@@ -219,12 +278,24 @@ def run(prompt: str, system_prompt: Optional[str] = None, model: Optional[str] =
         address = kwargs.get("address")
         chain_id = kwargs.get("chain_id")
         
+        # Add detailed logging
+        logger.info(f"Brian Transaction tool called with prompt: '{prompt}'")
+        logger.info(f"Address parameter: '{address}'")
+        logger.info(f"Chain ID parameter: '{chain_id}'")
+        
+        if not address:
+            logger.error("Missing required address parameter")
+            return {"error": "Missing required parameter: address", "response": "I need a connected wallet address to generate transaction data."}
+        
         # Initialize and run the tool
         brian_transaction = BrianTransaction()
-        return brian_transaction.run(prompt=prompt, system_prompt=system_prompt, 
-                                   model=model, address=address, chain_id=chain_id)
+        result = brian_transaction.run(prompt=prompt, system_prompt=system_prompt, 
+                                     model=model, address=address, chain_id=chain_id)
+        
+        return result
     except Exception as e:
-        return {"error": f"Error running Brian Transaction tool: {str(e)}"}
+        logger.exception(f"Error running Brian Transaction tool: {str(e)}")
+        return {"error": f"Error running Brian Transaction tool: {str(e)}", "response": "There was an error processing your transaction request."}
 
 
 if __name__ == "__main__":

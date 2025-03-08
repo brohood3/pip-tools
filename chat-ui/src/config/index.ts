@@ -8,7 +8,8 @@ import {
   base,
   gnosis,
   avalanche,
-  bsc
+  bsc,
+  sonic
 } from '@reown/appkit/networks'
 import type { AppKitNetwork } from '@reown/appkit/networks'
 
@@ -21,6 +22,7 @@ if (!projectId) {
 
 // Define supported networks
 export const networks = [
+  sonic,
   mainnet,
   arbitrum,
   polygon,

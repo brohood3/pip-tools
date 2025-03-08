@@ -4,8 +4,8 @@ import './globals.css';
 import ContextProvider from '@/context'
 
 export const metadata: Metadata = {
-  title: "Eolas AI Chat",
-  description: "AI Chat with Web3 integration",
+  title: "Chat with Nova",
+  description: "Chat with Nova, an autonomous AI with her own personality",
 };
 
 export default async function RootLayout({
