@@ -22,12 +22,13 @@ load_dotenv()
 # Set the API token
 api_token = os.getenv("REPLICATE_API_TOKEN")
 if not api_token:
-    # Use the provided token if not in environment
-    api_token = "r8_BetWyE5rihhv0s5eLIrE3zHtBc6Rwpz0Mwg19"
-    os.environ["REPLICATE_API_TOKEN"] = api_token
-    print(f"Using provided API token: {api_token[:5]}...{api_token[-5:]}")
+    print("Error: REPLICATE_API_TOKEN environment variable is not set.")
+    print("Please set the REPLICATE_API_TOKEN environment variable or create a .env file with it.")
+    sys.exit(1)
 else:
-    print(f"Using API token from environment: {api_token[:5]}...{api_token[-5:]}")
+    # Mask the token for security when printing
+    masked_token = f"{api_token[:5]}...{api_token[-5:]}" if len(api_token) > 10 else "***masked***"
+    print(f"Using API token from environment: {masked_token}")
 
 def main():
     """Run a test of the video generator tool with base64 encoding."""
