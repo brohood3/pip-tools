@@ -55,12 +55,13 @@ try:
         "price_predictor",
         "fundamental_analysis_venice",
         "technical_analysis",
-        "ten_word_ta",
+        "research_assistant",
         "general_predictor",
         "lunar_crush_screener",
         "query_extract",
         "macro_outlook_analyzer",
-        "brian_transaction"
+        "brian_transaction",
+        "video_generator"
     ]
     logger.info("Tool modules successfully imported")
 except ImportError as e:
