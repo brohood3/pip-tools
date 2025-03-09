@@ -21,10 +21,12 @@ optional_params:
 api_keys:
   replicate: string
 output_format:
-  video: string  # Either a file path or base64 encoded string
-  format: string  # "file_path" or "base64"
+  response:
+    video: string  # Either a file path or base64 encoded string
+    format: string  # "file_path" or "base64"
   metadata:
     timestamp: string
     prompt: string
     model: string
-    requested_model: string  # The model requested by the user (if any) 
+    requested_model: string  # The model requested by the user (if any)
+    format_type: string  # "file_path" or "base64" 

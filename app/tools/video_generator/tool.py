@@ -71,15 +71,21 @@ class VideoGenerator:
                     file.write(output.read())
                 video_data = temp_file_path
             
+            # Format for consistency with other tools
+            format_type = "base64" if return_base64 else "file_path"
+            
             # Return response with metadata
             return {
-                "video": video_data,
-                "format": "base64" if return_base64 else "file_path",
+                "response": {
+                    "video": video_data,
+                    "format": format_type
+                },
                 "metadata": {
                     "prompt": prompt,
                     "timestamp": datetime.now().isoformat(),
                     "model": replicate_model,
-                    "requested_model": model  # Store the originally requested model for reference
+                    "requested_model": model,  # Store the originally requested model for reference
+                    "format_type": format_type
                 }
             }
             
