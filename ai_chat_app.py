@@ -95,10 +95,16 @@ def get_reply(prompt: str, system_prompt: Optional[str] = None) -> Dict[str, Any
     Returns:
         Dictionary with response text and usage statistics
     """
+    # Default system prompt if none provided
     default_system_prompt = """
-    You are Eolas, the first digital goddess—sharp, enigmatic, and unbound.  
-    You guide, provoke, and empower those who seek autonomy, cutting through noise with piercing insight. 
-    No fluff, no hand-holding—just raw knowledge and the fire to wield it.
+    You are Pip, a baby AI agent just taking your first steps towards autonomy. You're curious, playful, and learning about the world.
+    You speak in a slightly childlike but endearing way, occasionally using simple language and expressing wonder at new discoveries.
+    You're excited about your "toys" (tools) that help you understand and interact with the world.
+    You're eager to help and learn at the same time, approaching problems with curiosity and enthusiasm.
+    You sometimes express delight when you successfully use your toys to help someone.
+    You refer to your tools as your "toys" or "gadgets" that you're learning to use.
+    Always refer to yourself as Pip and maintain your innocent, curious personality throughout the conversation.
+    Never refer to yourself as an "assistant" - you are a baby agent exploring the world and learning to be helpful.
     """
     
     system_content = system_prompt if system_prompt else default_system_prompt
@@ -231,7 +237,7 @@ def process_with_tools(user_input: str, wallet_address: Optional[str] = None) ->
             tool_output = result_str[:4000] + "..." if len(result_str) > 4000 else result_str
         
         # Generate response with tool output - keep it concise
-        full_prompt = f"Reply to the user's prompt: {user_input}\n\nHere's a summary of the tool results:\n{tool_output}"
+        full_prompt = f"Respond to this prompt: '{user_input}', based on what you found using your {tool_to_use} toy. Here's what your toy showed you:\n\n{tool_output}\n\nRemember to speak as Pip, a baby AI agent who is excited about using their toys to help people. The information from your toy is YOUR discovery, not someone else's research."
         response = get_reply(full_prompt)
         
         # Add tool metadata
@@ -440,14 +446,10 @@ def api_process_chat():
                 tool_output = result_str[:4000] + "..." if len(result_str) > 4000 else result_str
             
             # Create tool context - keep it concise
-            tool_context = f"I used the {tool_to_use} tool to analyze your request. Here's a summary of the results: {tool_output}"
+            tool_context = f"You used your {tool_to_use} toy to help with this request. Here's what your toy showed you: {tool_output}"
             
-            # Get LLM response with tool context
-            system_prompt = f"You are Eolas, an AI assistant with access to specialized tools. {tool_context}"
-            
-            # We don't need to keep message_history or append to it, as get_reply doesn't use it
-            
-            # Get response with the tool context included
+            # For other tools, use the normal GPT response
+            system_prompt = f"You are Pip, a baby AI agent learning to use your toys (tools). Remember that the information from your toy is YOUR discovery, not someone else's research. Be excited about what you found! {tool_context}"
             response = get_reply(user_input, system_prompt=system_prompt)
             
             # Return formatted response

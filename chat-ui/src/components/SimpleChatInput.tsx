@@ -41,10 +41,10 @@ const SimpleChatInput: React.FC<SimpleChatInputProps> = ({ onSendMessage }) => {
       style={{
         display: 'flex',
         gap: '12px',
-        backgroundColor: 'white',
-        borderRadius: '12px',
+        backgroundColor: '#F1F8E9',
+        borderRadius: '16px',
         padding: '12px',
-        border: '1px solid #e0e0e0',
+        border: '2px solid #A5D6A7',
         boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
       }} 
       onSubmit={handleSubmit}
@@ -54,7 +54,7 @@ const SimpleChatInput: React.FC<SimpleChatInputProps> = ({ onSendMessage }) => {
         value={message}
         onChange={(e) => setMessage(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="Type your message here..."
+        placeholder="Tell Pip what you'd like to do..."
         rows={1}
         style={{
           flex: 1,
@@ -63,9 +63,9 @@ const SimpleChatInput: React.FC<SimpleChatInputProps> = ({ onSendMessage }) => {
           padding: '10px',
           fontSize: '16px',
           outline: 'none',
-          fontFamily: 'inherit',
-          borderRadius: '8px',
-          backgroundColor: '#f9f9f9',
+          fontFamily: '"Comic Sans MS", "Comic Sans", cursive',
+          borderRadius: '10px',
+          backgroundColor: 'white',
           color: '#333',
           minHeight: '24px',
           maxHeight: '150px',
@@ -77,10 +77,10 @@ const SimpleChatInput: React.FC<SimpleChatInputProps> = ({ onSendMessage }) => {
         type="submit" 
         disabled={!message.trim()}
         style={{
-          backgroundColor: '#6e48aa',
+          backgroundColor: '#4CAF50',
           color: 'white',
           border: 'none',
-          borderRadius: '10px',
+          borderRadius: '12px',
           padding: '10px 18px',
           cursor: message.trim() ? 'pointer' : 'not-allowed',
           transition: 'all 0.2s ease',
@@ -90,7 +90,8 @@ const SimpleChatInput: React.FC<SimpleChatInputProps> = ({ onSendMessage }) => {
           alignItems: 'center',
           justifyContent: 'center',
           boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-          minWidth: '80px'
+          minWidth: '80px',
+          fontFamily: '"Comic Sans MS", "Comic Sans", cursive'
         }}
       >
         <span>Send</span>

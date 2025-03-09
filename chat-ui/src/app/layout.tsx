@@ -4,8 +4,8 @@ import './globals.css';
 import ContextProvider from '@/context'
 
 export const metadata: Metadata = {
-  title: "Chat with Nova",
-  description: "Chat with Nova, an autonomous AI with her own personality",
+  title: "Chat with Pip",
+  description: "Chat with Pip, a baby AI agent learning about the world",
 };
 
 export default async function RootLayout({

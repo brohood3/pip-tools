@@ -29,7 +29,7 @@ interface Message {
 export default function Home() {
   // Chat state
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: "Hey there! I'm Nova, an AI with a flair for the dramatic and a passion for problem-solving. What's on your mind today? 💫" }
+    { role: 'assistant', content: "Hello! I'm Pip, a baby AI just learning about the world! 👶 I have some fun toys (tools) that I'm learning to play with. Can I help you with something today? I might make some mistakes, but I'm excited to try!" }
   ]);
   const [isTyping, setIsTyping] = useState(false);
   const [model, setModel] = useState("gpt-4o");
@@ -242,7 +242,7 @@ export default function Home() {
   // Clear chat history
   const handleClearChat = () => {
     setMessages([
-      { role: 'assistant', content: "Hey there! I'm Nova, an AI with a flair for the dramatic and a passion for problem-solving. What's on your mind today? 💫" }
+      { role: 'assistant', content: "Hello! I'm Pip, a baby AI just learning about the world! 👶 I have some fun toys (tools) that I'm learning to play with. Can I help you with something today? I might make some mistakes, but I'm excited to try!" }
     ]);
   };
 
@@ -262,10 +262,27 @@ export default function Home() {
           gap: '15px', 
           marginBottom: '20px'
         }}>
-          <div style={{ fontSize: '2.5rem', color: '#6e48aa' }}>
-            <i className="fas fa-robot"></i>
+          <div style={{ 
+            fontSize: '2.5rem', 
+            color: '#4CAF50', 
+            backgroundColor: '#E8F5E9',
+            borderRadius: '50%',
+            width: '60px',
+            height: '60px',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            boxShadow: '0 4px 8px rgba(0,0,0,0.1)'
+          }}>
+            <i className="fab fa-android"></i>
           </div>
-          <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: '600' }}>AI Chat</h1>
+          <h1 style={{ 
+            margin: 0, 
+            fontSize: '2.2rem', 
+            fontWeight: '600',
+            color: '#4CAF50',
+            fontFamily: '"Comic Sans MS", "Comic Sans", cursive'
+          }}>Pip</h1>
         </div>
 
         {/* Header controls */}
@@ -278,19 +295,19 @@ export default function Home() {
           width: '100%'
         }}>
           {/* Wallet connection */}
-          <ConnectButton />
+      <ConnectButton />
           
           {/* Model selector */}
           <div style={{ 
             display: 'flex', 
             alignItems: 'center', 
             gap: '5px',
-            backgroundColor: 'white',
-            border: '1px solid #ddd',
-            borderRadius: '8px',
+            backgroundColor: '#E8F5E9',
+            border: '1px solid #A5D6A7',
+            borderRadius: '12px',
             padding: '0 8px'
           }}>
-            <i className="fas fa-microchip"></i>
+            <i className="fas fa-brain" style={{ color: '#4CAF50' }}></i>
             <select 
               value={model}
               onChange={(e) => setModel(e.target.value)}
@@ -300,12 +317,13 @@ export default function Home() {
                 padding: '10px 0',
                 fontSize: '14px',
                 color: '#333',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                fontFamily: '"Comic Sans MS", "Comic Sans", cursive'
               }}
             >
-              <option value="gpt-4o">GPT-4o</option>
-              <option value="gpt-4o-mini">GPT-4o Mini</option>
-              <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+              <option value="gpt-4o">Smart Brain</option>
+              <option value="gpt-4o-mini">Medium Brain</option>
+              <option value="gpt-3.5-turbo">Small Brain</option>
             </select>
           </div>
           
@@ -317,15 +335,16 @@ export default function Home() {
               alignItems: 'center',
               gap: '5px',
               padding: '10px',
-              backgroundColor: useTools ? '#6e48aa' : '#f0f0f0',
+              backgroundColor: useTools ? '#4CAF50' : '#f0f0f0',
               color: useTools ? 'white' : 'black',
               border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer'
+              borderRadius: '12px',
+              cursor: 'pointer',
+              fontFamily: '"Comic Sans MS", "Comic Sans", cursive'
             }}
           >
-            <i className="fas fa-wrench"></i>
-            <span>Tools: {useTools ? 'On' : 'Off'}</span>
+            <i className="fas fa-puzzle-piece"></i>
+            <span>Toys: {useTools ? 'On' : 'Off'}</span>
           </button>
           
           {/* Clear chat button */}
@@ -338,29 +357,32 @@ export default function Home() {
               padding: '10px',
               backgroundColor: '#f0f0f0',
               border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer'
+              borderRadius: '12px',
+              cursor: 'pointer',
+              fontFamily: '"Comic Sans MS", "Comic Sans", cursive'
             }}
           >
-            <i className="fas fa-trash"></i>
-            <span>Clear</span>
+            <i className="fas fa-eraser"></i>
+            <span>Start Over</span>
           </button>
         </div>
         
         {/* Chat UI */}
         <div className="chat-container" style={{ 
           width: '100%',
-          border: '1px solid #e0e0e0', 
-          borderRadius: '12px', 
+          border: '2px solid #A5D6A7', 
+          borderRadius: '16px', 
           padding: '16px', 
-          boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
-          backgroundColor: '#fcfcfc'
+          boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+          backgroundColor: '#FAFFF9'
         }}>
           <div className="message-container" style={{ 
             height: '450px', 
             overflowY: 'auto', 
             marginBottom: '16px',
-            padding: '8px'
+            padding: '8px',
+            backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'100\' height=\'100\' viewBox=\'0 0 100 100\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z\' fill=\'%234caf50\' fill-opacity=\'0.05\' fill-rule=\'evenodd\'/%3E%3C/svg%3E")',
+            backgroundSize: '150px 150px'
           }}>
             {messages.map((message, index) => (
               <div 
@@ -382,26 +404,28 @@ export default function Home() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    backgroundColor: message.role === 'user' ? '#007bff' : '#6e48aa',
+                    backgroundColor: message.role === 'user' ? '#2196F3' : '#4CAF50',
                     color: 'white',
                     marginRight: message.role === 'user' ? '0' : '12px',
                     marginLeft: message.role === 'user' ? '12px' : '0',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    fontSize: message.role === 'assistant' ? '18px' : '16px'
                   }}
                 >
-                  {message.role === 'user' ? 'U' : 'AI'}
+                  {message.role === 'user' ? <i className="fas fa-user"></i> : <i className="fab fa-android"></i>}
                 </div>
                 <div 
                   className="message-content"
                   style={{ 
                     padding: '12px',
-                    borderRadius: '12px',
-                    backgroundColor: message.role === 'user' ? '#007bff' : 'white',
-                    color: message.role === 'user' ? 'white' : '#333',
-                    border: message.role === 'assistant' ? '1px solid #eaeaea' : 'none',
+                    borderRadius: '16px',
+                    backgroundColor: message.role === 'user' ? '#E3F2FD' : '#E8F5E9',
+                    color: '#333',
+                    border: message.role === 'assistant' ? '1px solid #A5D6A7' : '1px solid #BBDEFB',
                     maxWidth: '75%',
                     boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-                    textAlign: 'left'
+                    textAlign: 'left',
+                    fontFamily: message.role === 'assistant' ? '"Comic Sans MS", "Comic Sans", cursive' : 'inherit'
                   }}
                 >
                   <div className="markdown-content" style={{ overflow: 'hidden' }}>
@@ -458,36 +482,17 @@ export default function Home() {
                     <div style={{ 
                       fontSize: '12px', 
                       marginTop: '8px', 
-                      backgroundColor: '#f8f0ff',
+                      backgroundColor: '#F1F8E9',
                       padding: '10px',
-                      borderRadius: '8px',
-                      border: '1px solid #e0d0ff',
-                      color: '#333'
+                      borderRadius: '12px',
+                      border: '1px dashed #A5D6A7',
+                      color: '#333',
+                      fontFamily: '"Comic Sans MS", "Comic Sans", cursive'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                        <i className="fas fa-tools"></i>
-                        <span style={{ fontWeight: 'bold' }}>Tool: {message.toolUsed}</span>
-                        {message.confidence && (
-                          <span style={{ 
-                            marginLeft: 'auto', 
-                            backgroundColor: 
-                              message.confidence === 'high' ? '#c8e6c9' : 
-                              message.confidence === 'medium' ? '#fff9c4' : '#ffcdd2',
-                            padding: '3px 8px',
-                            borderRadius: '4px',
-                            fontSize: '10px',
-                            fontWeight: 'bold',
-                            color: '#333'
-                          }}>
-                            {message.confidence.toUpperCase()}
-                          </span>
-                        )}
+                        <i className="fas fa-puzzle-piece" style={{ color: '#4CAF50' }}></i>
+                        <span style={{ fontWeight: 'bold' }}>Toy: {message.toolUsed}</span>
                       </div>
-                      {message.reasoning && (
-                        <div style={{ fontSize: '11px', marginTop: '4px' }}>
-                          <span style={{ fontStyle: 'italic' }}>Reasoning: {message.reasoning}</span>
-                        </div>
-                      )}
                       
                       {/* Transaction button for brian_transaction tool */}
                       {message.toolUsed === 'brian_transaction' && message.transaction_data && (
@@ -495,10 +500,10 @@ export default function Home() {
                           <button
                             onClick={() => handleExecuteTransaction(message.transaction_data)}
                             style={{
-                              backgroundColor: '#6e48aa',
+                              backgroundColor: '#4CAF50',
                               color: 'white',
                               border: 'none',
-                              borderRadius: '6px',
+                              borderRadius: '10px',
                               padding: '8px 14px',
                               fontSize: '13px',
                               cursor: 'pointer',
@@ -506,11 +511,12 @@ export default function Home() {
                               alignItems: 'center',
                               gap: '6px',
                               boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                              transition: 'all 0.2s ease'
+                              transition: 'all 0.2s ease',
+                              fontFamily: '"Comic Sans MS", "Comic Sans", cursive'
                             }}
                           >
                             <i className="fas fa-wallet"></i>
-                            <span>Execute Transaction</span>
+                            <span>Use Wallet</span>
                           </button>
                         </div>
                       )}
