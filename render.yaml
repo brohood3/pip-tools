@@ -27,7 +27,4 @@ services:
       - key: NODE_VERSION
         value: 18.12.1
       - key: NEXT_PUBLIC_API_URL
-        fromService:
-          name: pip-ai-backend
-          type: web
-          property: url 
+        value: https://pip-ai-backend.onrender.com 
