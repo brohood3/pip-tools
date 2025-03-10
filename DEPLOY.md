@@ -32,7 +32,7 @@ This guide walks you through deploying the Pip AI Chat application to [Render](h
    - **Name**: pip-backend
    - **Runtime**: Python
    - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `gunicorn -k eventlet -w 1 ai_chat_app:app --bind 0.0.0.0:$PORT`
+   - **Start Command**: `gunicorn -k eventlet -w 1 wsgi:app --bind 0.0.0.0:$PORT`
 5. Add environment variables:
    - `OPENAI_API_KEY`: Your OpenAI API key
    - `REPLICATE_API_TOKEN`: Your Replicate API token

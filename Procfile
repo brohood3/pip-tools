@@ -1,1 +1,1 @@
-web: gunicorn -k eventlet -w 1 ai_chat_app:app 
+web: gunicorn -k eventlet -w 1 wsgi:app 

@@ -6,7 +6,7 @@ services:
     region: oregon  # Choose your preferred region
     plan: starter  # Adjust based on your needs
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn -k eventlet -w 1 ai_chat_app:app --bind 0.0.0.0:$PORT
+    startCommand: gunicorn -k eventlet -w 1 wsgi:app --bind 0.0.0.0:$PORT
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.18
