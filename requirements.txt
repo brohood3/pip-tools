@@ -1,37 +1,37 @@
 # Core dependencies
-flask==2.3.3
-flask-socketio==5.3.6
-flask-cors==4.0.0
-flask-session==0.5.0
-python-dotenv==1.0.0
-eventlet==0.33.3
-openai==1.61.0
-requests==2.31.0
-pydantic==2.4.2
-siwe==2.1.0
+flask<2.3.3
+flask-socketio<5.3.6
+flask-cors<4.0.0
+flask-session<0.5.0
+python-dotenv<1.0.0
+eventlet<0.33.3
+openai<1.61.0
+requests<2.31.0
+pydantic<2.4.2
+siwe<2.1.0
 
 # Web server
-gunicorn==21.2.0
+gunicorn<21.2.0
 
 # AI and LLM integrations
-replicate==0.22.0  # For video generation
-litellm==1.61.0    # For LLM routing
+replicate<0.22.0  # For video generation
+litellm<1.61.0    # For LLM routing
 
 # Data processing and visualization
-pandas==2.1.1
-numpy==1.26.0
-matplotlib==3.8.0
-pandas-ta==0.3.14b0
-mplfinance==0.12.10b0
+pandas<2.1.1
+numpy<1.26.0
+matplotlib<3.8.0
+pandas-ta<0.3.14b0
+mplfinance<0.12.10b0
 
 # Web3 and blockchain
-web3==6.15.1
+web3<6.15.1
 
 # Utilities
-pyyaml==6.0.1
-python-dateutil==2.8.2
-pytz==2023.3
+pyyaml<6.0.1
+python-dateutil<2.8.2
+pytz<2023.3
 
 # Development tools (optional)
-pytest==7.4.0
-black==23.7.0 
+pytest<7.4.0
+black<23.7.0 
