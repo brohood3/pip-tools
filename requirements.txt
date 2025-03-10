@@ -1,5 +1,6 @@
 # Core dependencies
 flask==2.3.3
+Werkzeug==2.3.7  # Added to ensure Flask compatibility
 flask-socketio==5.3.6
 flask-cors==4.0.0
 flask-session==0.5.0
@@ -7,7 +8,7 @@ python-dotenv==1.0.0
 eventlet==0.33.3
 openai==1.61.0
 requests==2.31.0
-pydantic<2.4.2
+pydantic>=1.10.0,<2.0.0  # Updated for better compatibility with litellm
 siwe==2.1.0
 
 # Web server
@@ -25,7 +26,7 @@ pandas-ta==0.3.14b0
 mplfinance==0.12.10b0
 
 # Web3 and blockchain
-web3==6.15.1
+web3>=5.26.0,<6.0.0  # Updated to be compatible with siwe 2.1.0
 
 # Utilities
 pyyaml==6.0.1
