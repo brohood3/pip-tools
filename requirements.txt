@@ -9,7 +9,7 @@ eventlet==0.33.3
 openai==1.61.0
 requests==2.31.0
 pydantic>=2.0.0,<3.0.0  # Updated to v2 series
-siwe>=2.2.0  # Updated to support pydantic v2
+siwe>=4.4.0  # Latest version with web3 v7 support
 
 # Web server
 gunicorn==21.2.0
@@ -26,7 +26,7 @@ pandas-ta==0.3.14b0
 mplfinance==0.12.10b0
 
 # Web3 and blockchain
-web3>=5.26.0,<6.0.0  # Compatible with siwe
+web3>=7.3.0,<8.0.0  # Updated to be compatible with siwe 4.4.0
 
 # Utilities
 pyyaml==6.0.1
