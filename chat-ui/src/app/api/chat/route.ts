@@ -19,20 +19,22 @@ let token_usage = {
 };
 
 // URL for the Python backend API (configure in your environment variables)
-const PYTHON_API_URL = 'http://localhost:8080/api/process_chat';
+const PYTHON_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
-// Helper function to make HTTP requests to localhost
+// Helper function to make HTTP requests to the backend
 function makeLocalRequest(url: string, method: string, data: any): Promise<any> {
   return new Promise((resolve, reject) => {
-    // Parse the URL to get host, port, and path
-    const isHttps = url.startsWith('https:');
-    const fullUrl = new URL(url);
+    // Use the process_chat endpoint
+    const apiUrl = new URL('/api/process_chat', PYTHON_API_URL);
     const jsonData = JSON.stringify(data);
     
+    // Parse the URL to get host, port, and path
+    const isHttps = apiUrl.protocol === 'https:';
+    
     const options = {
-      hostname: fullUrl.hostname,
-      port: fullUrl.port || (isHttps ? 443 : 80),
-      path: fullUrl.pathname + fullUrl.search,
+      hostname: apiUrl.hostname,
+      port: apiUrl.port || (isHttps ? 443 : 80),
+      path: apiUrl.pathname,
       method: method,
       headers: {
         'Content-Type': 'application/json',

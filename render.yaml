@@ -1,44 +1,33 @@
 services:
-  # Python Backend Service
+  # Backend API
   - type: web
-    name: pip-backend
+    name: pip-ai-backend
     runtime: python
-    region: oregon  # Choose your preferred region
-    plan: starter  # Adjust based on your needs
-    buildCommand: pip install -r requirements.txt && chmod +x start.sh
-    startCommand: ./start.sh
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --worker-class eventlet -w 1 ai_chat_app:app
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.9.18
       - key: OPENAI_API_KEY
-        sync: false  # This will be set manually in the Render dashboard
+        sync: false
       - key: REPLICATE_API_TOKEN
-        sync: false  # This will be set manually in the Render dashboard
+        sync: false
       - key: SECRET_KEY
-        generateValue: true  # Automatically generate a secure value
-      - key: FLASK_ENV
-        value: production
+        generateValue: true
+      - key: PYTHON_VERSION
+        value: 3.9.16
       - key: CORS_ORIGINS
-        value: https://pip-frontend.onrender.com  # Update with your frontend URL
+        value: https://pip-ai-frontend.onrender.com,http://localhost:3000
 
-  # Next.js Frontend Service
+  # Frontend Next.js App
   - type: web
-    name: pip-frontend
+    name: pip-ai-frontend
     runtime: node
-    region: oregon  # Choose your preferred region
-    plan: starter  # Adjust based on your needs
     buildCommand: cd chat-ui && npm install && npm run build
     startCommand: cd chat-ui && npm start
     envVars:
       - key: NODE_VERSION
-        value: 18.17.0
+        value: 18.12.1
       - key: NEXT_PUBLIC_API_URL
-        value: https://pip-backend.onrender.com  # Update with your backend URL
-      - key: NEXT_PUBLIC_SOCKET_URL
-        value: https://pip-backend.onrender.com  # Update with your backend URL
-
-# Add a database if needed
-# - type: redis
-#   name: pip-cache
-#   ipAllowList: []  # Only allow internal connections
-#   plan: starter  # Adjust based on your needs 
+        fromService:
+          name: pip-ai-backend
+          type: web
+          property: url 

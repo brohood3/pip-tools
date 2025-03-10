@@ -4,6 +4,16 @@ import json
 from typing import Dict, Any, Optional
 from datetime import datetime
 
+from flask import Flask, request, jsonify, render_template, send_from_directory, redirect, url_for, session
+from openai import OpenAI
+from flask_socketio import SocketIO, emit
+from flask_session import Session
+from flask_cors import CORS
+
+# Import our authentication module
+from auth import auth_bp
+from auth_middleware import auth_required
+
 # Set up logging
 logging.basicConfig(
     level=logging.INFO,
@@ -12,34 +22,22 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Initialize the Flask app
-from flask import Flask, request, jsonify, render_template, send_from_directory, redirect, url_for, session
-from flask_cors import CORS
-
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev_key")
 
-# Enable CORS
-CORS(app, resources={r"/api/*": {"origins": "*"}})
+# Enable CORS with appropriate origins
+cors_origins = os.environ.get("CORS_ORIGINS", "http://localhost:3000").split(",")
+CORS(app, resources={r"/api/*": {"origins": cors_origins}})
 
 # Configure server-side session
 app.config["SESSION_TYPE"] = "filesystem"
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_USE_SIGNER"] = True
 app.config["SESSION_FILE_DIR"] = "./.flask_session/"
-
-# Deferred imports - only load these after basic Flask setup
-logger.info("Loading session module...")
-from flask_session import Session
 Session(app)
 
-logger.info("Loading socketio module...")
-from flask_socketio import SocketIO, emit
-socketio = SocketIO(app, cors_allowed_origins="*")
-
-# Import our authentication module
-logger.info("Loading authentication modules...")
-from auth import auth_bp
-from auth_middleware import auth_required
+# Initialize SocketIO
+socketio = SocketIO(app, cors_allowed_origins=cors_origins)
 
 # Register the authentication blueprint
 app.register_blueprint(auth_bp)
@@ -47,7 +45,6 @@ app.register_blueprint(auth_bp)
 # Try to import tools, but provide fallback if not available
 TOOL_IMPORTS_AVAILABLE = False
 try:
-    logger.info("Attempting to import tool modules...")
     from app.tools.helpers import TOOL_TO_MODULE
     from app.tools.tool_selector.tool import run as tool_selector
 
@@ -64,8 +61,7 @@ try:
         "lunar_crush_screener",
         "query_extract",
         "macro_outlook_analyzer",
-        "brian_transaction",
-        "video_generator"
+        "brian_transaction"
     ]
     logger.info("Tool modules successfully imported")
 except ImportError as e:
@@ -74,8 +70,6 @@ except ImportError as e:
 
 # Initialize OpenAI client
 try:
-    logger.info("Initializing OpenAI client...")
-    from openai import OpenAI
     openai_client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 except Exception as e:
     logger.error(f"Failed to initialize OpenAI client: {e}")
@@ -501,8 +495,8 @@ def handle_disconnect():
     logger.info('Client disconnected')
 
 # Main entry point
-if __name__ == "__main__":
-    # Check OpenAI API key
+if __name__ == '__main__':
+    # Check for API key
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         logger.error("OPENAI_API_KEY environment variable not found!")
@@ -519,9 +513,6 @@ if __name__ == "__main__":
         print("Please check your API key and internet connection.")
         exit(1)
     
-    # Use PORT environment variable or default to 8080 (for Render compatibility)
-    port = int(os.environ.get("PORT", 8080))
+    port = int(os.environ.get("PORT", 5001))
     debug = os.environ.get("DEBUG", "False").lower() == "true"
-    
-    print(f"Starting server on port {port}")
     socketio.run(app, host='0.0.0.0', port=port, debug=debug) 
