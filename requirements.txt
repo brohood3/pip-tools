@@ -10,6 +10,9 @@ openai==1.61.0
 requests==2.31.0
 pydantic>=2.0.0,<3.0.0  # Updated to v2 series
 siwe>=4.4.0  # Latest version with web3 v7 support
+fastapi>=0.109.0  # Added for general_predictor tool
+uvicorn>=0.27.0  # Added for FastAPI
+starlette>=0.36.0  # Added for FastAPI
 
 # Web server
 gunicorn==21.2.0
