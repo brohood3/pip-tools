@@ -23,21 +23,26 @@ logger = logging.getLogger(__name__)
 
 # Initialize the Flask app
 app = Flask(__name__, static_folder="static", template_folder="templates")
-app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev_key")
 
-# Enable CORS with appropriate origins
-cors_origins = os.environ.get("CORS_ORIGINS", "http://localhost:3000").split(",")
-CORS(app, resources={r"/api/*": {"origins": cors_origins}})
+# Enable CORS
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+CORS(app, resources={
+    r"/api/*": {
+        "origins": [FRONTEND_URL],
+        "supports_credentials": True
+    }
+})
 
 # Configure server-side session
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev_key")
 app.config["SESSION_TYPE"] = "filesystem"
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_USE_SIGNER"] = True
-app.config["SESSION_FILE_DIR"] = "./.flask_session/"
+app.config["SESSION_FILE_DIR"] = "/tmp/.flask_session/"  # Updated for Render compatibility
 Session(app)
 
-# Initialize SocketIO
-socketio = SocketIO(app, cors_allowed_origins=cors_origins)
+# Initialize SocketIO with CORS settings
+socketio = SocketIO(app, cors_allowed_origins=[FRONTEND_URL])
 
 # Register the authentication blueprint
 app.register_blueprint(auth_bp)

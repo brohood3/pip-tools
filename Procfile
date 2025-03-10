@@ -1,1 +1,0 @@
-web: gunicorn --worker-class eventlet -w 1 ai_chat_app:app 

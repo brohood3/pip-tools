@@ -1,30 +1,17 @@
 services:
-  # Backend API
   - type: web
-    name: pip-ai-backend
-    runtime: python
+    name: pip-chat-backend
+    env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn --worker-class eventlet -w 1 ai_chat_app:app
+    startCommand: gunicorn ai_chat_app:app --bind 0.0.0.0:$PORT --worker-class eventlet
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.9.0
       - key: OPENAI_API_KEY
         sync: false
       - key: REPLICATE_API_TOKEN
         sync: false
       - key: SECRET_KEY
         generateValue: true
-      - key: PYTHON_VERSION
-        value: 3.9.16
-      - key: CORS_ORIGINS
-        value: https://pip-ai-frontend.onrender.com,http://localhost:3000
-
-  # Frontend Next.js App
-  - type: web
-    name: pip-ai-frontend
-    runtime: node
-    buildCommand: cd chat-ui && npm install && npm run build
-    startCommand: cd chat-ui && npm start
-    envVars:
-      - key: NODE_VERSION
-        value: 18.12.1
-      - key: NEXT_PUBLIC_API_URL
-        value: https://pip-ai-backend.onrender.com 
+      - key: FRONTEND_URL
+        sync: false 

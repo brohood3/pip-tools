@@ -1,0 +1,11 @@
+{
+  "buildCommand": "cd chat-ui && npm install && npm run build",
+  "outputDirectory": "chat-ui/.next",
+  "framework": "nextjs",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/chat-ui/$1"
+    }
+  ]
+} 
