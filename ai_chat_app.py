@@ -39,6 +39,10 @@ app.config["SESSION_TYPE"] = "filesystem"
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_USE_SIGNER"] = True
 app.config["SESSION_FILE_DIR"] = "/tmp/.flask_session/"  # Updated for Render compatibility
+
+# Ensure session directory exists
+os.makedirs("/tmp/.flask_session/", exist_ok=True)
+
 Session(app)
 
 # Initialize SocketIO with CORS settings
@@ -487,6 +491,11 @@ def api_process_chat():
         logger.error(f"API error: {e}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/health')
+def health_check():
+    """Health check endpoint for Render."""
+    return jsonify({"status": "healthy", "message": "Pip Chat API is running"})
+
 # WebSocket events
 @socketio.on('connect')
 def handle_connect():
@@ -520,4 +529,10 @@ if __name__ == '__main__':
     
     port = int(os.environ.get("PORT", 5001))
     debug = os.environ.get("DEBUG", "False").lower() == "true"
-    socketio.run(app, host='0.0.0.0', port=port, debug=debug) 
+    socketio.run(app, host='0.0.0.0', port=port, debug=debug)
+else:
+    # When running with Gunicorn, make sure we have required environment variables
+    logger.info("Starting application with Gunicorn")
+    # This code runs when imported by Gunicorn
+    if not os.environ.get("OPENAI_API_KEY"):
+        logger.warning("OPENAI_API_KEY environment variable not found! Some features may not work correctly.") 

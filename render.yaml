@@ -1,9 +1,9 @@
 services:
   - type: web
     name: pip-chat-backend
-    env: python
+    runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn ai_chat_app:app --bind 0.0.0.0:$PORT --worker-class eventlet
+    startCommand: gunicorn ai_chat_app:app --bind 0.0.0.0:$PORT --timeout 120 --workers 2 --worker-class eventlet --log-level debug
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.0
