@@ -1,9 +1,3 @@
-# DEPRECATED: Please use pyproject.toml for dependency management
-# This file is kept for compatibility with environments that don't support pyproject.toml
-
-# Install dependencies using: pip install -r requirements.txt
-# Or preferably: poetry install
-
 # Pip AI Chat - Requirements
 # Install dependencies using: pip install -r requirements.txt
 
@@ -18,13 +12,16 @@ openai==1.61.0
 requests==2.31.0
 pydantic==2.4.2
 
-# Web server
+# Web server and API frameworks
 gunicorn==21.2.0
+fastapi==0.104.1
+uvicorn==0.24.0
+starlette==0.27.0
 
 # AI and LLM integrations
 replicate==0.22.0  # For video generation
-anthropic==0.8.0   # Optional: For Claude models
-litellm==1.61.0    # Optional: For LLM routing
+anthropic==0.8.0   # For Claude models
+litellm==1.61.0    # For LLM routing
 
 # Data processing and visualization
 pandas==2.1.1
@@ -33,19 +30,29 @@ matplotlib==3.8.0
 pandas-ta==0.3.14b0
 ta==0.10.2
 mplfinance==0.12.10b0
+plotly==5.18.0
 
 # API and networking
 httpx==0.27.2
 python-multipart==0.0.6
+aiohttp==3.9.1
+websockets==12.0
 
 # Utilities
 pyyaml==6.0.1
 python-dateutil==2.8.2
 pytz==2023.3
+tqdm==4.66.1
+tenacity==8.2.3
 
 # Web3 and blockchain
 web3==6.15.1
 siwe>=2.0.0  # Sign In With Ethereum
+eth-account==0.9.0
+
+# Natural language processing
+nltk==3.8.1
+spacy==3.7.2
 
 # Development tools (optional)
 pytest==7.4.0

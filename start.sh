@@ -17,11 +17,17 @@ if [ ! -f "wsgi.py" ]; then
 fi
 
 # Check Python version
+echo "Python version:"
 python --version
 
-# List current directory contents
-echo "Current directory contents:"
-ls -la
+# Check if critical modules are installed
+echo "Checking for critical modules..."
+python -c "import flask; print(f'Flask version: {flask.__version__}')"
+python -c "import openai; print(f'OpenAI version: {openai.__version__}')"
+python -c "import gunicorn; print(f'Gunicorn version: {gunicorn.__version__}')"
+python -c "import eventlet; print(f'Eventlet version: {eventlet.__version__}')"
+python -c "import fastapi; print(f'FastAPI version: {fastapi.__version__}')"
+python -c "import siwe; print(f'SIWE version: {siwe.__version__}')"
 
 # Start the application using Gunicorn with the correct module
 echo "Starting Gunicorn with wsgi:app..."
