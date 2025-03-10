@@ -7,7 +7,7 @@
     "npm": ">=9.0.0"
   },
   "scripts": {
-    "start": "gunicorn -k eventlet -w 1 wsgi:app",
+    "start": "./start.sh",
     "dev:backend": "python ai_chat_app.py",
     "dev:frontend": "cd chat-ui && npm run dev",
     "build:frontend": "cd chat-ui && npm run build",

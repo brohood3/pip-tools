@@ -5,8 +5,8 @@ services:
     runtime: python
     region: oregon  # Choose your preferred region
     plan: starter  # Adjust based on your needs
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn -k eventlet -w 1 wsgi:app --bind 0.0.0.0:$PORT
+    buildCommand: pip install -r requirements.txt && chmod +x start.sh
+    startCommand: ./start.sh
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.18
