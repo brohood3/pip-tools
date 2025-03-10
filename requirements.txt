@@ -8,8 +8,8 @@ python-dotenv==1.0.0
 eventlet==0.33.3
 openai==1.61.0
 requests==2.31.0
-pydantic>=1.10.0,<2.0.0  # Updated for better compatibility with litellm
-siwe==2.1.0
+pydantic>=2.0.0,<3.0.0  # Updated to v2 series
+siwe>=2.2.0  # Updated to support pydantic v2
 
 # Web server
 gunicorn==21.2.0
@@ -26,7 +26,7 @@ pandas-ta==0.3.14b0
 mplfinance==0.12.10b0
 
 # Web3 and blockchain
-web3>=5.26.0,<6.0.0  # Updated to be compatible with siwe 2.1.0
+web3>=5.26.0,<6.0.0  # Compatible with siwe
 
 # Utilities
 pyyaml==6.0.1
